@@ -26,7 +26,6 @@ import org.apache.camel.component.dropbox.util.DropboxResultHeader;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.junit.Test;
 
-
 public class DropboxProducerPutSingleFileWithRemotePathTest extends DropboxTestSupport {
 
     public DropboxProducerPutSingleFileWithRemotePathTest() throws Exception { }
@@ -58,7 +57,7 @@ public class DropboxProducerPutSingleFileWithRemotePathTest extends DropboxTestS
         return new RouteBuilder() {
             public void configure() {
                 from("direct:start")
-                        .to("dropbox://put?" + getAuthParams() + "&uploadMode=add&localPath=/XXX&remotePath=/XXX")
+                        .to("dropbox://put?accessToken={{accessToken}}&clientIdentifier={{clientIdentifier}}&uploadMode=add&localPath=/XXX&remotePath=/XXX")
                         .to("mock:result");
             }
         };

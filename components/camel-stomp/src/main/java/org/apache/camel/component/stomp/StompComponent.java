@@ -19,12 +19,37 @@ package org.apache.camel.component.stomp;
 import java.util.Map;
 
 import org.apache.camel.Endpoint;
-import org.apache.camel.impl.DefaultComponent;
 import org.apache.camel.impl.UriEndpointComponent;
+import org.apache.camel.spi.Metadata;
 
 public class StompComponent extends UriEndpointComponent {
 
+    /**
+     * To use the shared stomp configuration
+     */
     private StompConfiguration configuration = new StompConfiguration();
+
+    /**
+     * The URI of the Stomp broker to connect to
+     */
+    private String brokerUrl;
+
+    /**
+     * The username
+     */
+    @Metadata(label = "security", secret = true)
+    private String login;
+
+    /**
+     * The password
+     */
+    @Metadata(label = "security", secret = true)
+    private String passcode;
+
+    /**
+     * The virtual host
+     */
+    private String host;
 
     public StompComponent() {
         super(StompEndpoint.class);
@@ -59,27 +84,27 @@ public class StompComponent extends UriEndpointComponent {
      * The URI of the Stomp broker to connect to
      */
     public void setBrokerURL(String brokerURL) {
-        getConfiguration().setBrokerURL(brokerURL);
+        configuration.setBrokerURL(brokerURL);
     }
 
     /**
      * The username
      */
     public void setLogin(String login) {
-        getConfiguration().setLogin(login);
+        configuration.setLogin(login);
     }
 
     /**
      * The password
      */
     public void setPasscode(String passcode) {
-        getConfiguration().setPasscode(passcode);
+        configuration.setPasscode(passcode);
     }
     
     /**
      * The virtual host
      */
     public void setHost(String host) {
-        getConfiguration().setHost(host);
+        configuration.setHost(host);
     }
 }

@@ -32,11 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Defines the <a href="http://camel.apache.org/irc.html">IRC Endpoint</a>
- *
- * @version 
+ * The irc component implements an <a href="https://en.wikipedia.org/wiki/Internet_Relay_Chat">IRC</a> (Internet Relay Chat) transport.
  */
-@UriEndpoint(scheme = "irc", title = "IRC", syntax = "irc:hostname:port", consumerClass = IrcConsumer.class, label = "chat")
+@UriEndpoint(scheme = "irc", title = "IRC", syntax = "irc:hostname:port", alternativeSyntax = "irc:username:password@hostname:port", consumerClass = IrcConsumer.class, label = "chat")
 public class IrcEndpoint extends DefaultEndpoint {
     private static final Logger LOG = LoggerFactory.getLogger(IrcEndpoint.class);
 
@@ -204,6 +202,9 @@ public class IrcEndpoint extends DefaultEndpoint {
                 LOG.debug("Joining: {} using {}", channel, connection.getClass().getName());
             }
             connection.doJoin(chn);
+        }
+        if (configuration.isNamesOnJoin()) {
+            connection.doNames(chn);
         }
     }
 }

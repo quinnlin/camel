@@ -34,7 +34,7 @@ import org.apache.camel.util.component.ApiMethod;
 import org.apache.camel.util.component.ApiMethodPropertiesHelper;
 
 /**
- * Represents a GoogleCalendar endpoint.
+ * The google-calendar component provides access to Google Calendar.
  */
 @UriEndpoint(scheme = "google-calendar", title = "Google Calendar", syntax = "google-calendar:apiName/methodName",
 consumerClass = GoogleCalendarConsumer.class, consumerPrefix = "consumer", label = "api,cloud")
@@ -111,7 +111,7 @@ public class GoogleCalendarEndpoint extends AbstractApiEndpoint<GoogleCalendarAp
     }
 
     public Calendar getClient() {
-        return ((GoogleCalendarComponent)getComponent()).getClient();
+        return ((GoogleCalendarComponent)getComponent()).getClient(configuration);
     }
     
     @Override

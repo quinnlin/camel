@@ -16,8 +16,10 @@
  */
 package org.apache.camel.component.http4;
 
+import java.io.Closeable;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Map;
 
 import org.apache.camel.Consumer;
 import org.apache.camel.PollingConsumer;
@@ -25,8 +27,10 @@ import org.apache.camel.Processor;
 import org.apache.camel.Producer;
 import org.apache.camel.http.common.HttpCommonEndpoint;
 import org.apache.camel.http.common.HttpHelper;
+import org.apache.camel.http.common.cookie.CookieHandler;
 import org.apache.camel.spi.UriEndpoint;
 import org.apache.camel.spi.UriParam;
+import org.apache.camel.util.IOHelper;
 import org.apache.camel.util.ObjectHelper;
 import org.apache.http.HttpHost;
 import org.apache.http.client.CookieStore;
@@ -40,22 +44,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Represents a <a href="http://camel.apache.org/http.html">HTTP endpoint</a>
- *
- * @version 
+ * For calling out to external HTTP servers using Apache HTTP Client 4.x.
  */
-@UriEndpoint(scheme = "http4,http4s", title = "HTTP4,HTTP4S", syntax = "http4:httpUri", producerOnly = true, label = "http")
+@UriEndpoint(scheme = "http4,http4s", title = "HTTP4,HTTP4S", syntax = "http4:httpUri", producerOnly = true, label = "http", lenientProperties = true)
 public class HttpEndpoint extends HttpCommonEndpoint {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpEndpoint.class);
 
-    // Note: all options must be documented with description in annotations so extended components can access the documentation
-
+    @UriParam(label = "advanced")
     private HttpContext httpContext;
+    @UriParam(label = "advanced")
     private HttpClientConfigurer httpClientConfigurer;
+    @UriParam(label = "advanced", prefix = "httpClient.", multiValue = true)
+    private Map<String, Object> httpClientOptions;
+    @UriParam(label = "advanced")
     private HttpClientConnectionManager clientConnectionManager;
+    @UriParam(label = "advanced")
     private HttpClientBuilder clientBuilder;
-    private  HttpClient httpClient;
+    @UriParam(label = "advanced")
+    private HttpClient httpClient;
+    @UriParam(label = "advanced", defaultValue = "false")
+    private boolean useSystemProperties;
 
     @UriParam(label = "producer")
     private CookieStore cookieStore = new BasicCookieStore();
@@ -130,19 +139,26 @@ public class HttpEndpoint extends HttpCommonEndpoint {
         clientBuilder.setDefaultCookieStore(cookieStore);
         // setup the httpConnectionManager
         clientBuilder.setConnectionManager(clientConnectionManager);
+        if (getComponent() != null && getComponent().getClientConnectionManager() == getClientConnectionManager()) {
+            clientBuilder.setConnectionManagerShared(true);
+        }
 
-        // configure http proxy from camelContext
-        if (ObjectHelper.isNotEmpty(getCamelContext().getProperty("http.proxyHost")) && ObjectHelper.isNotEmpty(getCamelContext().getProperty("http.proxyPort"))) {
-            String host = getCamelContext().getProperty("http.proxyHost");
-            int port = Integer.parseInt(getCamelContext().getProperty("http.proxyPort"));
-            String scheme = getCamelContext().getProperty("http.proxyScheme");
-            // fallback and use either http or https depending on secure
-            if (scheme == null) {
-                scheme = HttpHelper.isSecureConnection(getEndpointUri()) ? "https" : "http";
+        if (!useSystemProperties) {
+            // configure http proxy from camelContext
+            if (ObjectHelper.isNotEmpty(getCamelContext().getProperty("http.proxyHost")) && ObjectHelper.isNotEmpty(getCamelContext().getProperty("http.proxyPort"))) {
+                String host = getCamelContext().getProperty("http.proxyHost");
+                int port = Integer.parseInt(getCamelContext().getProperty("http.proxyPort"));
+                String scheme = getCamelContext().getProperty("http.proxyScheme");
+                // fallback and use either http or https depending on secure
+                if (scheme == null) {
+                    scheme = HttpHelper.isSecureConnection(getEndpointUri()) ? "https" : "http";
+                }
+                LOG.debug("CamelContext properties http.proxyHost, http.proxyPort, and http.proxyScheme detected. Using http proxy host: {} port: {} scheme: {}", new Object[]{host, port, scheme});
+                HttpHost proxy = new HttpHost(host, port, scheme);
+                clientBuilder.setProxy(proxy);
             }
-            LOG.debug("CamelContext properties http.proxyHost, http.proxyPort, and http.proxyScheme detected. Using http proxy host: {} port: {} scheme: {}", new Object[]{host, port, scheme});
-            HttpHost proxy = new HttpHost(host, port, scheme);
-            clientBuilder.setProxy(proxy);
+        } else {
+            clientBuilder.useSystemProperties();
         }
         
         if (isAuthenticationPreemptive()) {
@@ -174,6 +190,9 @@ public class HttpEndpoint extends HttpCommonEndpoint {
         if (getComponent() != null && getComponent().getClientConnectionManager() != clientConnectionManager) {
             // need to shutdown the ConnectionManager
             clientConnectionManager.shutdown();
+        }
+        if (httpClient != null && httpClient instanceof Closeable) {
+            IOHelper.close((Closeable)httpClient);
         }
     }
 
@@ -212,6 +231,9 @@ public class HttpEndpoint extends HttpCommonEndpoint {
         this.httpClientConfigurer = httpClientConfigurer;
     }
 
+    /**
+     * To use a custom HttpContext instance
+     */
     public void setHttpContext(HttpContext httpContext) {
         this.httpContext = httpContext;
     }
@@ -248,9 +270,17 @@ public class HttpEndpoint extends HttpCommonEndpoint {
      * By default the org.apache.http.impl.client.BasicCookieStore is used which is an in-memory only cookie store.
      * Notice if bridgeEndpoint=true then the cookie store is forced to be a noop cookie store as cookie
      * shouldn't be stored as we are just bridging (eg acting as a proxy).
+     * If a cookieHandler is set then the cookie store is also forced to be a noop cookie store as cookie handling is
+     * then performed by the cookieHandler.
      */
     public void setCookieStore(CookieStore cookieStore) {
         this.cookieStore = cookieStore;
+    }
+
+    public void setCookieHandler(CookieHandler cookieHandler) {
+        super.setCookieHandler(cookieHandler);
+        // if we set an explicit cookie handler 
+        this.cookieStore = new NoopCookieStore();
     }
 
     public boolean isAuthenticationPreemptive() {
@@ -264,4 +294,25 @@ public class HttpEndpoint extends HttpCommonEndpoint {
         this.authenticationPreemptive = authenticationPreemptive;
     }
 
+    public Map<String, Object> getHttpClientOptions() {
+        return httpClientOptions;
+    }
+
+    /**
+     * To configure the HttpClient using the key/values from the Map.
+     */
+    public void setHttpClientOptions(Map<String, Object> httpClientOptions) {
+        this.httpClientOptions = httpClientOptions;
+    }
+
+    public boolean isUseSystemProperties() {
+        return useSystemProperties;
+    }
+
+    /**
+     * To use System Properties as fallback for configuration
+     */
+    public void setUseSystemProperties(boolean useSystemProperties) {
+        this.useSystemProperties = useSystemProperties;
+    }
 }

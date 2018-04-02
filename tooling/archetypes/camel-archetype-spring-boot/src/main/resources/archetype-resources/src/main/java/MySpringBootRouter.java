@@ -16,18 +16,18 @@
 ## ------------------------------------------------------------------------
 package ${package};
 
-import org.apache.camel.spring.boot.FatJarRouter;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.apache.camel.builder.RouteBuilder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 
-@SpringBootApplication
-public class MySpringBootRouter extends FatJarRouter {
+@Component
+public class MySpringBootRouter extends RouteBuilder {
 
     @Override
     public void configure() {
-        from("timer://trigger").
-                transform().simple("ref:myBean").
-                to("log:out", "mock:test");
+        from("timer:trigger")
+                .transform().simple("ref:myBean")
+                .to("log:out");
     }
 
     @Bean

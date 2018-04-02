@@ -52,6 +52,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SendProcessor extends ServiceSupport implements AsyncProcessor, Traceable, EndpointAware, IdAware {
     protected static final Logger LOG = LoggerFactory.getLogger(SendProcessor.class);
+    protected transient String traceLabelToString;
     protected final CamelContext camelContext;
     protected final ExchangePattern pattern;
     protected ProducerCache producerCache;
@@ -81,7 +82,7 @@ public class SendProcessor extends ServiceSupport implements AsyncProcessor, Tra
 
     @Override
     public String toString() {
-        return "sendTo(" + destination + (pattern != null ? " " + pattern : "") + ")";
+        return "sendTo(" + destination + ")";
     }
 
     public String getId() {
@@ -100,7 +101,10 @@ public class SendProcessor extends ServiceSupport implements AsyncProcessor, Tra
     }
 
     public String getTraceLabel() {
-        return URISupport.sanitizeUri(destination.getEndpointUri());
+        if (traceLabelToString == null) {
+            traceLabelToString = URISupport.sanitizeUri(destination.getEndpointUri());
+        }
+        return traceLabelToString;
     }
 
     @Override

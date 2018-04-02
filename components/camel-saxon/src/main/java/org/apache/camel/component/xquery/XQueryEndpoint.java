@@ -35,6 +35,9 @@ import org.apache.camel.util.ServiceHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Transforms the message using a XQuery template using Saxon.
+ */
 @UriEndpoint(scheme = "xquery", title = "XQuery", syntax = "xquery:resourceUri", label = "transformation")
 public class XQueryEndpoint extends ProcessorEndpoint {
 
@@ -209,18 +212,18 @@ public class XQueryEndpoint extends ProcessorEndpoint {
 
         LOG.debug("{} using schema resource: {}", this, resourceUri);
         URL url = ResourceHelper.resolveMandatoryResourceAsUrl(getCamelContext().getClassResolver(), resourceUri);
-        this.xquery = XQueryBuilder.xquery(url);
 
-        xquery.setConfiguration(getConfiguration());
-        xquery.setStaticQueryContext(getStaticQueryContext());
-        xquery.setParameters(getParameters());
-        xquery.setNamespaces(namespacePrefixes);
-        xquery.setResultsFormat(getResultsFormat());
-        xquery.setProperties(getProperties());
-        xquery.setResultType(getResultType());
-        xquery.setStripsAllWhiteSpace(isStripsAllWhiteSpace());
-        xquery.setAllowStAX(isAllowStAX());
-        xquery.setHeaderName(getHeaderName());
+        this.xquery = XQueryBuilder.xquery(url);
+        this.xquery.setConfiguration(getConfiguration());
+        this.xquery.setStaticQueryContext(getStaticQueryContext());
+        this.xquery.setParameters(getParameters());
+        this.xquery.setNamespaces(namespacePrefixes);
+        this.xquery.setResultsFormat(getResultsFormat());
+        this.xquery.setProperties(getProperties());
+        this.xquery.setResultType(getResultType());
+        this.xquery.setStripsAllWhiteSpace(isStripsAllWhiteSpace());
+        this.xquery.setAllowStAX(isAllowStAX());
+        this.xquery.setHeaderName(getHeaderName());
 
         setProcessor(xquery);
 

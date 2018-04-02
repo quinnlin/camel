@@ -36,6 +36,12 @@ public abstract class MessageSupport implements Message {
     private Object body;
     private String messageId;
 
+    @Override
+    public String toString() {
+        // do not output information about the message as it may contain sensitive information
+        return String.format("Message[%s]", messageId == null ? "" : messageId);
+    }
+
     public Object getBody() {
         if (body == null) {
             body = createBody();
@@ -130,9 +136,17 @@ public abstract class MessageSupport implements Message {
             // the same instance so do not need to copy
             return;
         }
+        copyFromWithNewBody(that, that.getBody());
+    }
+
+    public void copyFromWithNewBody(Message that, Object newBody) {
+        if (that == this) {
+            // the same instance so do not need to copy
+            return;
+        }
 
         setMessageId(that.getMessageId());
-        setBody(that.getBody());
+        setBody(newBody);
         setFault(that.isFault());
 
         // the headers may be the same instance if the end user has made some mistake
@@ -167,17 +181,17 @@ public abstract class MessageSupport implements Message {
         // the attachments may be the same instance if the end user has made some mistake
         // and set the OUT message with the same attachment instance of the IN message etc
         boolean sameAttachments = false;
-        if (hasAttachments() && that.hasAttachments() && getAttachments() == that.getAttachments()) {
+        if (hasAttachments() && that.hasAttachments() && getAttachmentObjects() == that.getAttachmentObjects()) {
             sameAttachments = true;
         }
 
         if (!sameAttachments) {
             if (hasAttachments()) {
                 // okay its safe to clear the attachments
-                getAttachments().clear();
+                getAttachmentObjects().clear();
             }
             if (that.hasAttachments()) {
-                getAttachments().putAll(that.getAttachments());
+                getAttachmentObjects().putAll(that.getAttachmentObjects());
             }
         }
     }

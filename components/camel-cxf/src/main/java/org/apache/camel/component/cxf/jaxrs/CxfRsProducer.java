@@ -16,10 +16,13 @@
  */
 package org.apache.camel.component.cxf.jaxrs;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.net.CookieStore;
+import java.net.HttpCookie;
 import java.net.URLDecoder;
 import java.util.Collection;
 import java.util.HashMap;
@@ -27,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.ws.rs.core.NewCookie;
 import javax.ws.rs.core.Response;
 
 import org.apache.camel.CamelExchangeException;
@@ -35,6 +39,7 @@ import org.apache.camel.Message;
 import org.apache.camel.component.cxf.CxfEndpointUtils;
 import org.apache.camel.component.cxf.CxfOperationException;
 import org.apache.camel.component.cxf.common.message.CxfConstants;
+import org.apache.camel.http.common.cookie.CookieHandler;
 import org.apache.camel.impl.DefaultProducer;
 import org.apache.camel.util.IOHelper;
 import org.apache.camel.util.LRUSoftCache;
@@ -161,6 +166,7 @@ public class CxfRsProducer extends DefaultProducer {
             cfb.setBus(bus);
         }
         WebClient client = cfb.createWebClient();
+        ((CxfRsEndpoint) getEndpoint()).getChainedCxfRsEndpointConfigurer().configureClient(client);
         String httpMethod = inMessage.getHeader(Exchange.HTTP_METHOD, String.class);
         Class<?> responseClass = inMessage.getHeader(CxfConstants.CAMEL_CXF_RS_RESPONSE_CLASS, Class.class);
         Type genericType = inMessage.getHeader(CxfConstants.CAMEL_CXF_RS_RESPONSE_GENERIC_TYPE, Type.class);
@@ -203,7 +209,11 @@ public class CxfRsProducer extends DefaultProducer {
         setupClientMatrix(client, exchange); 
 
         setupClientQueryAndHeaders(client, exchange);
-        
+
+        // handle cookies
+        CookieHandler cookieHandler = ((CxfRsEndpoint)getEndpoint()).getCookieHandler();
+        loadCookies(exchange, client, cookieHandler);
+
         // invoke the client
         Object response = null;
         if (responseClass == null || Response.class.equals(responseClass)) {
@@ -223,6 +233,8 @@ public class CxfRsProducer extends DefaultProducer {
             }
         }
         int statesCode = client.getResponse().getStatus();
+        // handle cookies
+        saveCookies(exchange, client, cookieHandler);
         //Throw exception on a response > 207
         //http://en.wikipedia.org/wiki/List_of_HTTP_status_codes
         if (throwException) {
@@ -244,6 +256,33 @@ public class CxfRsProducer extends DefaultProducer {
             // just close the input stream of the response object
             if (response instanceof Response) {
                 ((Response)response).close();
+            }
+        }
+    }
+
+    private void saveCookies(Exchange exchange, Client client, CookieHandler cookieHandler) {
+        if (cookieHandler != null) {
+            CookieStore cookieStore = cookieHandler.getCookieStore(exchange);
+            for (NewCookie newCookie: client.getResponse().getCookies().values()) {
+                HttpCookie cookie = new HttpCookie(newCookie.getName(), newCookie.getValue());
+                cookie.setComment(newCookie.getComment());
+                cookie.setDomain(newCookie.getDomain());
+                cookie.setHttpOnly(newCookie.isHttpOnly());
+                cookie.setMaxAge(newCookie.getMaxAge());
+                cookie.setPath(newCookie.getPath());
+                cookie.setSecure(newCookie.isSecure());
+                cookie.setVersion(newCookie.getVersion());
+                cookieStore.add(client.getCurrentURI(), cookie);
+            }
+        }
+    }
+
+    private void loadCookies(Exchange exchange, Client client, CookieHandler cookieHandler) throws IOException {
+        if (cookieHandler != null) {
+            for (Map.Entry<String, List<String>> cookie : cookieHandler.loadCookies(exchange, client.getCurrentURI()).entrySet()) {
+                if (cookie.getValue().size() > 0) {
+                    client.header(cookie.getKey(), cookie.getValue());
+                }
             }
         }
     }
@@ -279,10 +318,17 @@ public class CxfRsProducer extends DefaultProducer {
         }
         // get the method
         Method method = findRightMethod(sfb.getResourceClasses(), methodName, getParameterTypes(parameters));
+
+        // handle cookies
+        CookieHandler cookieHandler = ((CxfRsEndpoint)getEndpoint()).getCookieHandler();
+        loadCookies(exchange, target, cookieHandler);
+
         // Will send out the message to
         // Need to deal with the sub resource class
         Object response = method.invoke(target, parameters);
         int statesCode = target.getResponse().getStatus();
+        // handle cookies
+        saveCookies(exchange, target, cookieHandler);
         if (throwException) {
             if (response instanceof Response) {
                 Integer respCode = ((Response) response).getStatus();
@@ -401,7 +447,7 @@ public class CxfRsProducer extends DefaultProducer {
     protected CxfOperationException populateCxfRsProducerException(Exchange exchange, Response response, int responseCode) {
         CxfOperationException exception;
         String uri = exchange.getFromEndpoint().getEndpointUri();
-        String statusText = Response.Status.fromStatusCode(responseCode).toString();
+        String statusText = statusTextFromResponseCode(responseCode);
         Map<String, String> headers = parseResponseHeaders(response, exchange);
         //Get the response detail string
         String copy = exchange.getContext().getTypeConverter().convertTo(String.class, response.getEntity());
@@ -420,6 +466,32 @@ public class CxfRsProducer extends DefaultProducer {
         }
 
         return exception;
+    }
+
+    /**
+     * Convert the given HTTP response code to its corresponding status text or
+     * response category. This is useful to avoid creating NPEs if this producer
+     * is presented with an HTTP response code that the JAX-RS API doesn't know.
+     *
+     * @param responseCode the HTTP response code to be converted to status text
+     * @return the status text for the code, or, if JAX-RS doesn't know the code,
+     *         the status category as text
+     */
+    String statusTextFromResponseCode(int responseCode) {
+        Response.Status status = Response.Status.fromStatusCode(responseCode);
+
+        return status != null ? status.toString() : responseCategoryFromCode(responseCode);
+    }
+
+    /**
+     * Return the category of the given HTTP response code, as text. Invalid
+     * codes will result in appropriate text; this method never returns null.
+     *
+     * @param responseCode HTTP response code whose category is to be returned
+     * @return the category of the give response code; never {@code null}.
+     */
+    private String responseCategoryFromCode(int responseCode) {
+        return Response.Status.Family.familyOf(responseCode).name();
     }
 
     protected Map<String, String> parseResponseHeaders(Object response, Exchange camelExchange) {
@@ -442,7 +514,7 @@ public class CxfRsProducer extends DefaultProducer {
     class ClientFactoryBeanCache {
         private LRUSoftCache<String, JAXRSClientFactoryBean> cache;    
         
-        public ClientFactoryBeanCache(final int maxCacheSize) {
+        ClientFactoryBeanCache(final int maxCacheSize) {
             this.cache = new LRUSoftCache<String, JAXRSClientFactoryBean>(maxCacheSize);
         }
         

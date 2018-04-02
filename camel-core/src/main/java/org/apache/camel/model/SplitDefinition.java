@@ -27,10 +27,10 @@ import org.apache.camel.CamelContextAware;
 import org.apache.camel.Expression;
 import org.apache.camel.Processor;
 import org.apache.camel.model.language.ExpressionDefinition;
-import org.apache.camel.processor.CamelInternalProcessor;
 import org.apache.camel.processor.Splitter;
 import org.apache.camel.processor.aggregate.AggregationStrategy;
 import org.apache.camel.processor.aggregate.AggregationStrategyBeanAdapter;
+import org.apache.camel.processor.aggregate.ShareUnitOfWorkAggregationStrategy;
 import org.apache.camel.spi.Metadata;
 import org.apache.camel.spi.RouteContext;
 import org.apache.camel.util.CamelContextHelper;
@@ -119,12 +119,6 @@ public class SplitDefinition extends ExpressionNode implements ExecutorServiceAw
         Splitter answer = new Splitter(routeContext.getCamelContext(), exp, childProcessor, aggregationStrategy,
                             isParallelProcessing, threadPool, shutdownThreadPool, isStreaming, isStopOnException(),
                             timeout, onPrepare, isShareUnitOfWork, isParallelAggregate);
-        if (isShareUnitOfWork) {
-            // wrap answer in a sub unit of work, since we share the unit of work
-            CamelInternalProcessor internalProcessor = new CamelInternalProcessor(answer);
-            internalProcessor.addAdvice(new CamelInternalProcessor.SubUnitOfWorkProcessorAdvice());
-            return internalProcessor;
-        }
         return answer;
     }
 
@@ -148,6 +142,11 @@ public class SplitDefinition extends ExpressionNode implements ExecutorServiceAw
 
         if (strategy != null && strategy instanceof CamelContextAware) {
             ((CamelContextAware) strategy).setCamelContext(routeContext.getCamelContext());
+        }
+
+        if (strategy != null && shareUnitOfWork != null && shareUnitOfWork) {
+            // wrap strategy in share unit of work
+            strategy = new ShareUnitOfWorkAggregationStrategy(strategy);
         }
 
         return strategy;

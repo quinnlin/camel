@@ -44,6 +44,7 @@ import org.apache.camel.core.xml.CamelPropertyPlaceholderDefinition;
 import org.apache.camel.core.xml.CamelServiceExporterDefinition;
 import org.apache.camel.core.xml.CamelStreamCachingStrategyDefinition;
 import org.apache.camel.model.ContextScanDefinition;
+import org.apache.camel.model.HystrixConfigurationDefinition;
 import org.apache.camel.model.InterceptDefinition;
 import org.apache.camel.model.InterceptFromDefinition;
 import org.apache.camel.model.InterceptSendToEndpointDefinition;
@@ -57,8 +58,14 @@ import org.apache.camel.model.RouteContextRefDefinition;
 import org.apache.camel.model.RouteDefinition;
 import org.apache.camel.model.ThreadPoolProfileDefinition;
 import org.apache.camel.model.dataformat.DataFormatsDefinition;
+import org.apache.camel.model.remote.ConsulConfigurationDefinition;
+import org.apache.camel.model.remote.DnsConfigurationDefinition;
+import org.apache.camel.model.remote.EtcdConfigurationDefinition;
+import org.apache.camel.model.remote.KubernetesConfigurationDefinition;
+import org.apache.camel.model.remote.RibbonConfigurationDefinition;
 import org.apache.camel.model.rest.RestConfigurationDefinition;
 import org.apache.camel.model.rest.RestDefinition;
+import org.apache.camel.model.transformer.TransformersDefinition;
 import org.apache.camel.spi.PackageScanFilter;
 import org.apache.camel.spi.Registry;
 import org.osgi.framework.BundleContext;
@@ -80,101 +87,112 @@ import org.slf4j.LoggerFactory;
 public class CamelContextFactoryBean extends AbstractCamelContextFactoryBean<BlueprintCamelContext> {
     private static final Logger LOG = LoggerFactory.getLogger(CamelContextFactoryBean.class);
 
-    @XmlAttribute(name = "depends-on", required = false)
+    @XmlAttribute(name = "depends-on")
     private String dependsOn;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String trace;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String messageHistory;
-    @XmlAttribute(required = false)
+    @XmlAttribute
+    private String logExhaustedMessageBody;
+    @XmlAttribute
     private String streamCache = "false";
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String delayer;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String handleFault;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String errorHandlerRef;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String autoStartup = "true";
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String useMDCLogging;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String useBreadcrumb;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String allowUseOriginalMessage;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String runtimeEndpointRegistryEnabled;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String managementNamePattern;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private String threadNamePattern;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private Boolean useBlueprintPropertyResolver;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private ShutdownRoute shutdownRoute;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private ShutdownRunningTask shutdownRunningTask;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     @Deprecated
     private Boolean lazyLoadTypeConverters;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private Boolean typeConverterStatisticsEnabled;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private TypeConverterExists typeConverterExists;
-    @XmlAttribute(required = false)
+    @XmlAttribute
     private LoggingLevel typeConverterExistsLoggingLevel;
-    @XmlElement(name = "properties", required = false)
+    @XmlElement(name = "properties")
     private PropertiesDefinition properties;
-    @XmlElement(name = "propertyPlaceholder", type = CamelPropertyPlaceholderDefinition.class, required = false)
+    @XmlElement(name = "propertyPlaceholder", type = CamelPropertyPlaceholderDefinition.class)
     private CamelPropertyPlaceholderDefinition camelPropertyPlaceholder;
-    @XmlElement(name = "package", required = false)
+    @XmlElement(name = "package")
     private String[] packages = {};
-    @XmlElement(name = "packageScan", type = PackageScanDefinition.class, required = false)
+    @XmlElement(name = "packageScan", type = PackageScanDefinition.class)
     private PackageScanDefinition packageScan;
-    @XmlElement(name = "contextScan", type = ContextScanDefinition.class, required = false)
+    @XmlElement(name = "contextScan", type = ContextScanDefinition.class)
     private ContextScanDefinition contextScan;
-    @XmlElement(name = "jmxAgent", type = CamelJMXAgentDefinition.class, required = false)
+    @XmlElement(name = "jmxAgent", type = CamelJMXAgentDefinition.class)
     private CamelJMXAgentDefinition camelJMXAgent;
-    @XmlElement(name = "streamCaching", type = CamelStreamCachingStrategyDefinition.class, required = false)
+    @XmlElement(name = "streamCaching", type = CamelStreamCachingStrategyDefinition.class)
     private CamelStreamCachingStrategyDefinition camelStreamCachingStrategy;
     @XmlElements({
-        @XmlElement(name = "template", type = CamelProducerTemplateFactoryBean.class, required = false),
-        @XmlElement(name = "consumerTemplate", type = CamelConsumerTemplateFactoryBean.class, required = false),
-        @XmlElement(name = "proxy", type = CamelProxyFactoryBean.class, required = false),
-        @XmlElement(name = "export", type = CamelServiceExporterDefinition.class, required = false),
-        @XmlElement(name = "errorHandler", type = CamelErrorHandlerFactoryBean.class, required = false)})
+        @XmlElement(name = "hystrixConfiguration", type = HystrixConfigurationDefinition.class),
+        @XmlElement(name = "kubernetesConfiguration", type = KubernetesConfigurationDefinition.class),
+        @XmlElement(name = "ribbonConfiguration", type = RibbonConfigurationDefinition.class),
+        @XmlElement(name = "consulConfiguration", type = ConsulConfigurationDefinition.class),
+        @XmlElement(name = "dnsConfiguration", type = DnsConfigurationDefinition.class),
+        @XmlElement(name = "etcdConfiguration", type = EtcdConfigurationDefinition.class),
+        @XmlElement(name = "template", type = CamelProducerTemplateFactoryBean.class),
+        @XmlElement(name = "fluentTemplate", type = CamelFluentProducerTemplateFactoryBean.class),
+        @XmlElement(name = "consumerTemplate", type = CamelConsumerTemplateFactoryBean.class),
+        @XmlElement(name = "proxy", type = CamelProxyFactoryBean.class),
+        @XmlElement(name = "export", type = CamelServiceExporterDefinition.class),
+        @XmlElement(name = "errorHandler", type = CamelErrorHandlerFactoryBean.class)})
     private List<?> beans;
-    @XmlElement(name = "routeBuilder", required = false)
+    @XmlElement(name = "routeBuilder")
     private List<RouteBuilderDefinition> builderRefs = new ArrayList<RouteBuilderDefinition>();
-    @XmlElement(name = "routeContextRef", required = false)
+    @XmlElement(name = "routeContextRef")
     private List<RouteContextRefDefinition> routeRefs = new ArrayList<RouteContextRefDefinition>();
-    @XmlElement(name = "restContextRef", required = false)
+    @XmlElement(name = "restContextRef")
     private List<RestContextRefDefinition> restRefs = new ArrayList<RestContextRefDefinition>();
-    @XmlElement(name = "threadPoolProfile", required = false)
+    @XmlElement(name = "threadPoolProfile")
     private List<ThreadPoolProfileDefinition> threadPoolProfiles;
-    @XmlElement(name = "threadPool", required = false)
+    @XmlElement(name = "threadPool")
     private List<CamelThreadPoolFactoryBean> threadPools;
-    @XmlElement(name = "endpoint", required = false)
+    @XmlElement(name = "endpoint")
     private List<CamelEndpointFactoryBean> endpoints;
-    @XmlElement(name = "dataFormats", required = false)
+    @XmlElement(name = "dataFormats")
     private DataFormatsDefinition dataFormats;
-    @XmlElement(name = "redeliveryPolicyProfile", required = false)
+    @XmlElement(name = "transformers")
+    private TransformersDefinition transformers;
+    @XmlElement(name = "redeliveryPolicyProfile")
     private List<CamelRedeliveryPolicyFactoryBean> redeliveryPolicies;
-    @XmlElement(name = "onException", required = false)
+    @XmlElement(name = "onException")
     private List<OnExceptionDefinition> onExceptions = new ArrayList<OnExceptionDefinition>();
-    @XmlElement(name = "onCompletion", required = false)
+    @XmlElement(name = "onCompletion")
     private List<OnCompletionDefinition> onCompletions = new ArrayList<OnCompletionDefinition>();
-    @XmlElement(name = "intercept", required = false)
+    @XmlElement(name = "intercept")
     private List<InterceptDefinition> intercepts = new ArrayList<InterceptDefinition>();
-    @XmlElement(name = "interceptFrom", required = false)
+    @XmlElement(name = "interceptFrom")
     private List<InterceptFromDefinition> interceptFroms = new ArrayList<InterceptFromDefinition>();
-    @XmlElement(name = "interceptSendToEndpoint", required = false)
+    @XmlElement(name = "interceptSendToEndpoint")
     private List<InterceptSendToEndpointDefinition> interceptSendToEndpoints = new ArrayList<InterceptSendToEndpointDefinition>();
-    @XmlElement(name = "restConfiguration", required = false)
+    @XmlElement(name = "restConfiguration")
     private RestConfigurationDefinition restConfiguration;
-    @XmlElement(name = "rest", required = false)
+    @XmlElement(name = "rest")
     private List<RestDefinition> rests = new ArrayList<RestDefinition>();
-    @XmlElement(name = "route", required = false)
+    @XmlElement(name = "route")
     private List<RouteDefinition> routes = new ArrayList<RouteDefinition>();
     @XmlTransient
     private BlueprintCamelContext context;
@@ -255,14 +273,15 @@ public class CamelContextFactoryBean extends AbstractCamelContextFactoryBean<Blu
 
             // no locations has been set, so its a default component
             if (pc.getLocations() == null) {
-                StringBuilder sb = new StringBuilder();
                 String[] ids = parser.lookupPropertyPlaceholderIds();
-                for (String id : ids) {
-                    sb.append("blueprint:").append(id).append(",");
+                for (int i = 0; i < ids.length; i++) {
+                    if (!ids[i].startsWith("blueprint:")) {
+                        ids[i] = "blueprint:" + ids[i];
+                    }
                 }
-                if (sb.length() > 0) {
+                if (ids.length > 0) {
                     // location supports multiple separated by comma
-                    pc.setLocation(sb.toString());
+                    pc.setLocations(ids);
                 }
             }
 
@@ -509,6 +528,14 @@ public class CamelContextFactoryBean extends AbstractCamelContextFactoryBean<Blu
         this.messageHistory = messageHistory;
     }
 
+    public String getLogExhaustedMessageBody() {
+        return logExhaustedMessageBody;
+    }
+
+    public void setLogExhaustedMessageBody(String logExhaustedMessageBody) {
+        this.logExhaustedMessageBody = logExhaustedMessageBody;
+    }
+
     public String getStreamCache() {
         return streamCache;
     }
@@ -619,6 +646,14 @@ public class CamelContextFactoryBean extends AbstractCamelContextFactoryBean<Blu
 
     public void setDataFormats(DataFormatsDefinition dataFormats) {
         this.dataFormats = dataFormats;
+    }
+
+    public void setTransformers(TransformersDefinition transformers) {
+        this.transformers = transformers;
+    }
+
+    public TransformersDefinition getTransformers() {
+        return transformers;
     }
 
     public List<OnExceptionDefinition> getOnExceptions() {

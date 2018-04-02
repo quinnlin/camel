@@ -36,7 +36,7 @@ public class CxfComponent extends HeaderFilterStrategyComponent {
     private static final Logger LOG = LoggerFactory.getLogger(CxfComponent.class);
 
     private Boolean allowStreaming;
-    
+
     public CxfComponent() {
         super(CxfEndpoint.class);
     }
@@ -74,7 +74,7 @@ public class CxfComponent extends HeaderFilterStrategyComponent {
                 parameters.put("defaultBus", value);
             }
         }
-        
+
         if (allowStreaming != null && !parameters.containsKey("allowStreaming")) {
             parameters.put("allowStreaming", Boolean.toString(allowStreaming));
         }
@@ -86,8 +86,8 @@ public class CxfComponent extends HeaderFilterStrategyComponent {
                 beanId = beanId.substring(2);
             }
 
-            result = CamelContextHelper.mandatoryLookup(getCamelContext(), beanId, CxfEndpoint.class);
-            // need to check the CamelContext value 
+            result = createCxfSpringEndpoint(beanId);
+            // need to check the CamelContext value
             if (getCamelContext().equals(result.getCamelContext())) {
                 result.setCamelContext(getCamelContext());
             }
@@ -95,8 +95,9 @@ public class CxfComponent extends HeaderFilterStrategyComponent {
 
         } else {
             // endpoint URI does not specify a bean
-            result = new CxfEndpoint(remaining, this);
+            result = createCxfEndpoint(remaining);
         }
+
         if (result.getCamelContext() == null) {
             result.setCamelContext(getCamelContext());
         }
@@ -116,9 +117,18 @@ public class CxfComponent extends HeaderFilterStrategyComponent {
         return result;
     }
 
+    protected CxfEndpoint createCxfSpringEndpoint(String beanId) throws Exception {
+        return CamelContextHelper.mandatoryLookup(getCamelContext(), beanId, CxfEndpoint.class);
+    }
+
+    protected CxfEndpoint createCxfEndpoint(String remaining) {
+        return new CxfEndpoint(remaining, this);
+    }
+
     @Override
     protected void afterConfiguration(String uri, String remaining, Endpoint endpoint, Map<String, Object> parameters) throws Exception {
         CxfEndpoint cxfEndpoint = (CxfEndpoint) endpoint;
         cxfEndpoint.updateEndpointUri(uri);
     }
+
 }

@@ -98,6 +98,11 @@ public class VerbDefinition extends OptionalIdentifiedDefinition<VerbDefinition>
     private RestDefinition rest;
     @XmlAttribute
     private String routeId;
+    @XmlAttribute
+    private Boolean apiDocs;
+
+    @XmlTransient
+    private Boolean usedForGeneratingNodeId = Boolean.FALSE;
 
     @Override
     public String getLabel() {
@@ -252,6 +257,19 @@ public class VerbDefinition extends OptionalIdentifiedDefinition<VerbDefinition>
         this.routeId = routeId;
     }
 
+    public Boolean getApiDocs() {
+        return apiDocs;
+    }
+
+    /**
+     * Whether to include or exclude the VerbDefinition in API documentation.
+     * <p/>
+     * The default value is true.
+     */
+    public void setApiDocs(Boolean apiDocs) {
+        this.apiDocs = apiDocs;
+    }
+
     public RestDefinition getRest() {
         return rest;
     }
@@ -378,6 +396,8 @@ public class VerbDefinition extends OptionalIdentifiedDefinition<VerbDefinition>
             return "post";
         } else if (this instanceof PutVerbDefinition) {
             return "put";
+        } else if (this instanceof PatchVerbDefinition) {
+            return "patch";
         } else if (this instanceof DeleteVerbDefinition) {
             return "delete";
         } else if (this instanceof HeadVerbDefinition) {
@@ -389,6 +409,11 @@ public class VerbDefinition extends OptionalIdentifiedDefinition<VerbDefinition>
         }
     }
 
+    public Boolean getUsedForGeneratingNodeId() {
+        return usedForGeneratingNodeId;
+    }
 
-
+    public void setUsedForGeneratingNodeId(Boolean usedForGeneratingNodeId) {
+        this.usedForGeneratingNodeId = usedForGeneratingNodeId;
+    }
 }

@@ -34,19 +34,22 @@ public class RestConfiguration {
     }
 
     public enum RestHostNameResolver {
-        localIp, localHostName
+        allLocalIp, localIp, localHostName
     }
 
     private String component;
     private String apiComponent;
+    private String producerComponent;
+    private String producerApiDoc;
     private String scheme;
     private String host;
     private int port;
     private String contextPath;
     private String apiContextPath;
+    private String apiContextRouteId;
     private String apiContextIdPattern;
     private boolean apiContextListing;
-    private RestHostNameResolver restHostNameResolver = RestHostNameResolver.localHostName;
+    private RestHostNameResolver restHostNameResolver = RestHostNameResolver.allLocalIp;
     private RestBindingMode bindingMode = RestBindingMode.off;
     private boolean skipBindingOnErrorCode = true;
     private boolean enableCORS;
@@ -93,6 +96,45 @@ public class RestConfiguration {
      */
     public void setApiComponent(String apiComponent) {
         this.apiComponent = apiComponent;
+    }
+
+    /**
+     * Gets the name of the Camel component to use as the REST producer
+     *
+     * @return the component name, or <tt>null</tt> to let Camel search the {@link Registry} to find suitable implementation
+     */
+    public String getProducerComponent() {
+        return producerComponent;
+    }
+
+    /**
+     * Sets the name of the Camel component to use as the REST producer
+     *
+     * @param componentName the name of the component (such as restlet, jetty, etc.)
+     */
+    public void setProducerComponent(String componentName) {
+        this.producerComponent = componentName;
+    }
+
+    /**
+     * Gets the location of the api document (swagger api) the REST producer will use
+     * to validate the REST uri and query parameters are valid accordingly to the api document.
+     */
+    public String getProducerApiDoc() {
+        return producerApiDoc;
+    }
+
+    /**
+     * Sets the location of the api document (swagger api) the REST producer will use
+     * to validate the REST uri and query parameters are valid accordingly to the api document.
+     * This requires adding camel-swagger-java to the classpath, and any miss configuration
+     * will let Camel fail on startup and report the error(s).
+     * <p/>
+     * The location of the api document is loaded from classpath by default, but you can use
+     * <tt>file:</tt> or <tt>http:</tt> to refer to resources to load from file or http url.
+     */
+    public void setProducerApiDoc(String producerApiDoc) {
+        this.producerApiDoc = producerApiDoc;
     }
 
     /**
@@ -185,6 +227,21 @@ public class RestConfiguration {
      */
     public void setApiContextPath(String contextPath) {
         this.apiContextPath = contextPath;
+    }
+
+    public String getApiContextRouteId() {
+        return apiContextRouteId;
+    }
+
+    /**
+     * Sets the route id to use for the route that services the REST API.
+     * <p/>
+     * The route will by default use an auto assigned route id.
+     *
+     * @param apiContextRouteId  the route id
+     */
+    public void setApiContextRouteId(String apiContextRouteId) {
+        this.apiContextRouteId = apiContextRouteId;
     }
 
     public String getApiContextIdPattern() {

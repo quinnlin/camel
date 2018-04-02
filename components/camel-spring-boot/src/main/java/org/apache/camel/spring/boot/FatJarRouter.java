@@ -20,13 +20,14 @@ import org.apache.camel.builder.RouteBuilder;
 import org.springframework.boot.SpringApplication;
 import org.springframework.context.ApplicationContext;
 
+@Deprecated
 public class FatJarRouter extends RouteBuilder {
 
     public static void main(String... args) {
         ApplicationContext applicationContext = new SpringApplication(FatJarRouter.class).run(args);
         CamelSpringBootApplicationController applicationController =
                 applicationContext.getBean(CamelSpringBootApplicationController.class);
-        applicationController.blockMainThread();
+        applicationController.run();
     }
 
     @Override

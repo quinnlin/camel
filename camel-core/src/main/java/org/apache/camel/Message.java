@@ -235,11 +235,23 @@ public interface Message {
 
     /**
      * Copies the contents of the other message into this message
+     * <p/>
+     * If you need to do a copy and then set a new body,
+     * then use {@link #copyFromWithNewBody(Message, Object)} method instead.
      *
      * @param message the other message
+     * @see #copyFromWithNewBody(Message, Object)
      */
     void copyFrom(Message message);
     
+    /**
+     * Copies the contents (except the body) of the other message into this message and uses the provided new body instead
+     *
+     * @param message the other message
+     * @param newBody the new body to use
+     */
+    void copyFromWithNewBody(Message message, Object newBody);
+
     /**
      * Copies the attachments of the other message into this message
      *
@@ -254,6 +266,14 @@ public interface Message {
      * @return the data handler for this attachment or <tt>null</tt>
      */
     DataHandler getAttachment(String id);
+
+    /**
+     * Returns the attachment specified by the id
+     *
+     * @param id the id under which the attachment is stored
+     * @return the attachment or <tt>null</tt>
+     */
+    Attachment getAttachmentObject(String id);
 
     /**
      * Returns a set of attachment names of the message
@@ -278,6 +298,14 @@ public interface Message {
     void addAttachment(String id, DataHandler content);
 
     /**
+     * Adds an attachment to the message using the id
+     *
+     * @param id        the id to store the attachment under
+     * @param content   the attachment
+     */
+    void addAttachmentObject(String id, Attachment content);
+
+    /**
      * Returns all attachments of the message
      *
      * @return the attachments in a map or <tt>null</tt>
@@ -285,11 +313,25 @@ public interface Message {
     Map<String, DataHandler> getAttachments();
 
     /**
+     * Returns all attachments of the message
+     *
+     * @return the attachments in a map or <tt>null</tt>
+     */
+    Map<String, Attachment> getAttachmentObjects();
+
+    /**
      * Set all the attachments associated with this message
      *
      * @param attachments the attachments
      */
     void setAttachments(Map<String, DataHandler> attachments);
+
+    /**
+     * Set all the attachments associated with this message
+     *
+     * @param attachments the attachments
+     */
+    void setAttachmentObjects(Map<String, Attachment> attachments);
 
     /**
      * Returns whether this message has attachments.

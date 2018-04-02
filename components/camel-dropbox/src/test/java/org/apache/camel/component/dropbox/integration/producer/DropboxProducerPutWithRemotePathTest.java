@@ -16,7 +16,6 @@
  */
 package org.apache.camel.component.dropbox.integration.producer;
 
-
 import java.util.List;
 
 import org.apache.camel.Exchange;
@@ -26,7 +25,6 @@ import org.apache.camel.component.dropbox.integration.DropboxTestSupport;
 import org.apache.camel.component.dropbox.util.DropboxResultHeader;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.junit.Test;
-
 
 public class DropboxProducerPutWithRemotePathTest extends DropboxTestSupport {
 
@@ -59,7 +57,7 @@ public class DropboxProducerPutWithRemotePathTest extends DropboxTestSupport {
         return new RouteBuilder() {
             public void configure() {
                 from("direct:start")
-                        .to("dropbox://put?" + getAuthParams() + "&uploadMode=add&localPath=/XXX&remotePath=/XXX")
+                        .to("dropbox://put?accessToken={{accessToken}}&clientIdentifier={{clientIdentifier}}&uploadMode=add&localPath=/XXX&remotePath=/XXX")
                         .to("mock:result");
             }
         };

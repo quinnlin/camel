@@ -49,6 +49,7 @@ import org.apache.camel.StreamCache;
 import org.apache.camel.Traceable;
 import org.apache.camel.processor.aggregate.AggregationStrategy;
 import org.apache.camel.processor.aggregate.CompletionAwareAggregationStrategy;
+import org.apache.camel.processor.aggregate.DelegateAggregationStrategy;
 import org.apache.camel.processor.aggregate.TimeoutAwareAggregationStrategy;
 import org.apache.camel.spi.IdAware;
 import org.apache.camel.spi.RouteContext;
@@ -78,7 +79,7 @@ import static org.apache.camel.util.ObjectHelper.notNull;
  * Implements the Multicast pattern to send a message exchange to a number of
  * endpoints, each endpoint receiving a copy of the message exchange.
  *
- * @version 
+ * @version
  * @see Pipeline
  */
 public class MulticastProcessor extends ServiceSupport implements AsyncProcessor, Navigate<Processor>, Traceable, IdAware {
@@ -137,7 +138,7 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
      */
     static final class PreparedErrorHandler extends KeyValueHolder<RouteContext, Processor> {
 
-        public PreparedErrorHandler(RouteContext key, Processor value) {
+        PreparedErrorHandler(RouteContext key, Processor value) {
             super(key, value);
         }
 
@@ -293,15 +294,19 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
 
             while (it.hasNext()) {
                 final ProcessorExchangePair pair = it.next();
+                // in case the iterator returns null then continue to next
+                if (pair == null) {
+                    continue;
+                }
+
                 final Exchange subExchange = pair.getExchange();
                 updateNewExchange(subExchange, total.intValue(), pairs, it);
 
                 completion.submit(new Callable<Exchange>() {
                     public Exchange call() throws Exception {
-                        // only start the aggregation task when the task is being executed to avoid staring
-                        // the aggregation task to early and pile up too many threads
+                        // start the aggregation task at this stage only in order not to pile up too many threads
                         if (aggregationTaskSubmitted.compareAndSet(false, true)) {
-                            // but only submit the task once
+                            // but only submit the aggregation task once
                             aggregateExecutorService.submit(aggregateOnTheFlyTask);
                         }
 
@@ -526,7 +531,9 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
                 }
             } catch (Throwable e) {
                 // wrap in exception to explain where it failed
-                subExchange.setException(new CamelExchangeException("Parallel processing failed for number " + aggregated.get(), subExchange, e));
+                CamelExchangeException cex = new CamelExchangeException("Parallel processing failed for number " + aggregated.get(), subExchange, e);
+                subExchange.setException(cex);
+                LOG.debug(cex.getMessage(), cex);
             } finally {
                 aggregated.incrementAndGet();
             }
@@ -558,6 +565,9 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
         @Override
         public void run() {
             AggregationStrategy strategy = getAggregationStrategy(null);
+            if (strategy instanceof DelegateAggregationStrategy) {
+                strategy = ((DelegateAggregationStrategy) strategy).getDelegate();
+            }
             if (strategy instanceof TimeoutAwareAggregationStrategy) {
                 // notify the strategy we timed out
                 Exchange oldExchange = result.get();
@@ -590,6 +600,10 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
 
         while (it.hasNext()) {
             ProcessorExchangePair pair = it.next();
+            // in case the iterator returns null then continue to next
+            if (pair == null) {
+                continue;
+            }
             Exchange subExchange = pair.getExchange();
             updateNewExchange(subExchange, total.get(), pairs, it);
 
@@ -630,7 +644,7 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
             } else {
                 doAggregate(getAggregationStrategy(subExchange), result, subExchange);
             }
-            
+
             total.incrementAndGet();
         }
 
@@ -852,6 +866,9 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
         }
 
         AggregationStrategy strategy = getAggregationStrategy(subExchange);
+        if (strategy instanceof DelegateAggregationStrategy) {
+            strategy = ((DelegateAggregationStrategy) strategy).getDelegate();
+        }
         // invoke the on completion callback
         if (strategy instanceof CompletionAwareAggregationStrategy) {
             ((CompletionAwareAggregationStrategy) strategy).onCompletion(subExchange);
@@ -874,7 +891,7 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
         // must copy results at this point
         if (subExchange != null) {
             if (stoppedOnException) {
-                // if we stopped due an exception then only propagte the exception
+                // if we stopped due an exception then only propagate the exception
                 original.setException(subExchange.getException());
             } else {
                 // copy the current result to original so it will contain this result of this eip
@@ -961,7 +978,7 @@ public class MulticastProcessor extends ServiceSupport implements AsyncProcessor
                     // because streams can only be read once
                     StreamCache copiedStreamCache = streamCache.copy(copy);
                     if (copiedStreamCache != null) {
-                        copy.getIn().setBody(copiedStreamCache);  
+                        copy.getIn().setBody(copiedStreamCache);
                     }
                 }
             }

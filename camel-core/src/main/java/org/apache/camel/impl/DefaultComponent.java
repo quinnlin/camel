@@ -41,11 +41,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Default component to use for base for components implementations.
- *
- * @version 
  */
 public abstract class DefaultComponent extends ServiceSupport implements Component {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultComponent.class);
+    private static final Pattern RAW_PATTERN = Pattern.compile("RAW(.*&&.*)");
 
     private CamelContext camelContext;
 
@@ -58,16 +57,7 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
 
     @Deprecated
     protected String preProcessUri(String uri) {
-        // Give components a chance to preprocess URIs and migrate to URI syntax that discourages invalid URIs
-        // (see CAMEL-4425)
-        // check URI string to the unsafe URI characters
-        String encodedUri = UnsafeUriCharactersEncoder.encode(uri);
-        if (!encodedUri.equals(uri)) {
-            // uri supplied is not really valid
-            // we just don't want to log the password setting here
-            LOG.warn("Supplied URI '{}' contains unsafe characters, please check encoding", URISupport.sanitizeUri(uri));
-        }
-        return encodedUri;
+        return UnsafeUriCharactersEncoder.encode(uri);
     }
 
     public Endpoint createEndpoint(String uri) throws Exception {
@@ -106,7 +96,7 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
         validateURI(uri, path, parameters);
         if (LOG.isTraceEnabled()) {
             // at trace level its okay to have parameters logged, that may contain passwords
-            LOG.trace("Creating endpoint uri=[{}], path=[{}], parameters=[{}]", new Object[]{URISupport.sanitizeUri(uri), URISupport.sanitizePath(path), parameters});
+            LOG.trace("Creating endpoint uri=[{}], path=[{}], parameters=[{}]", URISupport.sanitizeUri(uri), URISupport.sanitizePath(path), parameters);
         } else if (LOG.isDebugEnabled()) {
             // but at debug level only output sanitized uris
             LOG.debug("Creating endpoint uri=[{}], path=[{}]", new Object[]{URISupport.sanitizeUri(uri), URISupport.sanitizePath(path)});
@@ -116,17 +106,15 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
             return null;
         }
 
-        if (!parameters.isEmpty()) {
-            endpoint.configureProperties(parameters);
-            if (useIntrospectionOnEndpoint()) {
-                setProperties(endpoint, parameters);
-            }
+        endpoint.configureProperties(parameters);
+        if (useIntrospectionOnEndpoint()) {
+            setProperties(endpoint, parameters);
+        }
 
-            // if endpoint is strict (not lenient) and we have unknown parameters configured then
-            // fail if there are parameters that could not be set, then they are probably misspell or not supported at all
-            if (!endpoint.isLenientProperties()) {
-                validateParameters(uri, parameters, null);
-            }
+        // if endpoint is strict (not lenient) and we have unknown parameters configured then
+        // fail if there are parameters that could not be set, then they are probably misspell or not supported at all
+        if (!endpoint.isLenientProperties()) {
+            validateParameters(uri, parameters, null);
         }
 
         afterConfiguration(uri, path, endpoint, parameters);
@@ -174,6 +162,10 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
      * @throws ResolveEndpointFailedException should be thrown if the URI validation failed
      */
     protected void validateParameters(String uri, Map<String, Object> parameters, String optionPrefix) {
+        if (parameters == null || parameters.isEmpty()) {
+            return;
+        }
+
         Map<String, Object> param = parameters;
         if (optionPrefix != null) {
             param = IntrospectionSupport.extractProperties(parameters, optionPrefix);
@@ -196,16 +188,9 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
      * @throws ResolveEndpointFailedException should be thrown if the URI validation failed
      */
     protected void validateURI(String uri, String path, Map<String, Object> parameters) {
-        // check for uri containing & but no ? marker
-        if (uri.contains("&") && !uri.contains("?")) {
-            throw new ResolveEndpointFailedException(uri, "Invalid uri syntax: no ? marker however the uri "
-                + "has & parameter separators. Check the uri if its missing a ? marker.");
-        }
-
         // check for uri containing double && markers without include by RAW
         if (uri.contains("&&")) {
-            Pattern pattern = Pattern.compile("RAW(.*&&.*)");
-            Matcher m = pattern.matcher(uri);
+            Matcher m = RAW_PATTERN.matcher(uri);
             // we should skip the RAW part
             if (!m.find()) {
                 throw new ResolveEndpointFailedException(uri, "Invalid uri syntax: Double && marker found. "
@@ -258,9 +243,19 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
      * @param parameters  properties to set
      */
     protected void setProperties(Object bean, Map<String, Object> parameters) throws Exception {        
+        setProperties(getCamelContext(), bean, parameters);
+    }
+
+    /**
+     * Sets the bean properties on the given bean using the given {@link CamelContext}
+     * @param camelContext  the {@link CamelContext} to use
+     * @param bean  the bean
+     * @param parameters  properties to set
+     */
+    protected void setProperties(CamelContext camelContext, Object bean, Map<String, Object> parameters) throws Exception {
         // set reference properties first as they use # syntax that fools the regular properties setter
-        EndpointHelper.setReferenceProperties(getCamelContext(), bean, parameters);
-        EndpointHelper.setProperties(getCamelContext(), bean, parameters);
+        EndpointHelper.setReferenceProperties(camelContext, bean, parameters);
+        EndpointHelper.setProperties(camelContext, bean, parameters);
     }
 
     /**
@@ -376,7 +371,7 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
         if (value == null) {
             return defaultValue;
         } else {
-            return EndpointHelper.resolveReferenceParameter(getCamelContext(), value.toString(), type);
+            return EndpointHelper.resolveReferenceParameter(getCamelContext(), value, type);
         }
     }
     
@@ -384,34 +379,27 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
      * Resolves a reference list parameter in the registry and removes it from
      * the map.
      * 
-     * @param parameters
-     *            parameter map.
-     * @param key
-     *            parameter map key.
-     * @param elementType
-     *            result list element type.
+     * @param parameters parameter map.
+     * @param key parameter map key.
+     * @param elementType result list element type.
      * @return the list of referenced objects or an empty list if the parameter
      *         map doesn't contain the key.
-     * @throws IllegalArgumentException if any of the referenced objects was 
+     * @throws IllegalArgumentException if any of the referenced objects was
      *         not found in registry.
      * @see EndpointHelper#resolveReferenceListParameter(CamelContext, String, Class)
      */
     public <T> List<T> resolveAndRemoveReferenceListParameter(Map<String, Object> parameters, String key, Class<T> elementType) {
-        return resolveAndRemoveReferenceListParameter(parameters, key, elementType, new ArrayList<T>(0));
+        return resolveAndRemoveReferenceListParameter(parameters, key, elementType, new ArrayList<>(0));
     }
 
     /**
      * Resolves a reference list parameter in the registry and removes it from
      * the map.
      * 
-     * @param parameters
-     *            parameter map.
-     * @param key
-     *            parameter map key.
-     * @param elementType
-     *            result list element type.
-     * @param defaultValue
-     *            default value to use if the parameter map doesn't
+     * @param parameters parameter map.
+     * @param key parameter map key.
+     * @param elementType result list element type.
+     * @param defaultValue default value to use if the parameter map doesn't
      *            contain the key.
      * @return the list of referenced objects or the default value.
      * @throws IllegalArgumentException if any of the referenced objects was 
@@ -424,7 +412,7 @@ public abstract class DefaultComponent extends ServiceSupport implements Compone
         if (value == null) {
             return defaultValue;
         } else {
-            return EndpointHelper.resolveReferenceListParameter(getCamelContext(), value.toString(), elementType);
+            return EndpointHelper.resolveReferenceListParameter(getCamelContext(), value, elementType);
         }
     }
     

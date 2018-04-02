@@ -22,6 +22,7 @@ import java.util.Map;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLEventReader;
 import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.events.XMLEvent;
 
 import org.slf4j.Logger;
@@ -42,7 +43,7 @@ public final class ScrHelper {
     }
 
     public static Map<String, String> getScrProperties(String xmlLocation, String componentName) throws Exception {
-        Map<String, String> result = new HashMap<String, String>();
+        Map<String, String> result = new HashMap<>();
 
         XMLInputFactory inputFactory = XMLInputFactory.newFactory();
         inputFactory.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
@@ -50,16 +51,16 @@ public final class ScrHelper {
         boolean collect = false;
         while (eventReader.hasNext()) {
             XMLEvent event = eventReader.nextEvent();
-            if (event.getEventType() == XMLEvent.START_ELEMENT
+            if (event.getEventType() == XMLStreamConstants.START_ELEMENT
                 && event.asStartElement().getName().toString().equals("scr:component")
                 && event.asStartElement().getAttributeByName(QName.valueOf("name")).getValue().equals(componentName)) {
                 collect = true;
             } else if (collect
-                && event.getEventType() == XMLEvent.START_ELEMENT
+                && event.getEventType() == XMLStreamConstants.START_ELEMENT
                 && event.asStartElement().getName().toString().equals("property")) {
                 result.put(event.asStartElement().getAttributeByName(QName.valueOf("name")).getValue(), event.asStartElement().getAttributeByName(QName.valueOf("value")).getValue());
             } else if (collect
-                && event.getEventType() == XMLEvent.END_ELEMENT
+                && event.getEventType() == XMLStreamConstants.END_ELEMENT
                 && event.asEndElement().getName().toString().equals("scr:component")) {
                 break;
             }

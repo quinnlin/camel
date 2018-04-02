@@ -23,11 +23,14 @@ import com.github.dockerjava.api.DockerClient;
 import org.apache.camel.Endpoint;
 import org.apache.camel.component.docker.exception.DockerException;
 import org.apache.camel.impl.DefaultComponent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents the component that manages {@link DockerEndpoint}.
  */
 public class DockerComponent extends DefaultComponent {
+    private static final Logger LOG = LoggerFactory.getLogger(DockerComponent.class);
 
     private DockerConfiguration configuration = new DockerConfiguration();
     private Map<DockerClientProfile, DockerClient> clients = new HashMap<DockerClientProfile, DockerClient>();
@@ -87,5 +90,4 @@ public class DockerComponent extends DefaultComponent {
     public void setClient(DockerClientProfile clientProfile, DockerClient client) {
         clients.put(clientProfile, client);
     }
-
 }

@@ -42,8 +42,11 @@ public class RestConfigurationDefinition {
     @XmlAttribute
     private String component;
 
-    @XmlAttribute @Metadata(defaultValue = "swagger")
+    @XmlAttribute @Metadata(label = "consumer", defaultValue = "swagger")
     private String apiComponent;
+
+    @XmlAttribute @Metadata(label = "producer")
+    private String producerComponent;
 
     @XmlAttribute
     private String scheme;
@@ -54,28 +57,34 @@ public class RestConfigurationDefinition {
     @XmlAttribute
     private String port;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "producer")
+    private String producerApiDoc;
+
+    @XmlAttribute @Metadata(label = "consumer")
     private String contextPath;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "consumer")
     private String apiContextPath;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "consumer")
+    private String apiContextRouteId;
+
+    @XmlAttribute @Metadata(label = "consumer")
     private String apiContextIdPattern;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "consumer")
     private Boolean apiContextListing;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "consumer")
     private RestHostNameResolver hostNameResolver;
 
-    @XmlAttribute @Metadata(defaultValue = "auto")
+    @XmlAttribute @Metadata(defaultValue = "off")
     private RestBindingMode bindingMode;
 
     @XmlAttribute
     private Boolean skipBindingOnErrorCode;
 
-    @XmlAttribute
+    @XmlAttribute @Metadata(label = "consumer")
     private Boolean enableCORS;
 
     @XmlAttribute
@@ -90,16 +99,16 @@ public class RestConfigurationDefinition {
     @XmlElement(name = "endpointProperty")
     private List<RestPropertyDefinition> endpointProperties = new ArrayList<RestPropertyDefinition>();
 
-    @XmlElement(name = "consumerProperty")
+    @XmlElement(name = "consumerProperty") @Metadata(label = "consumer")
     private List<RestPropertyDefinition> consumerProperties = new ArrayList<RestPropertyDefinition>();
 
     @XmlElement(name = "dataFormatProperty")
     private List<RestPropertyDefinition> dataFormatProperties = new ArrayList<RestPropertyDefinition>();
 
-    @XmlElement(name = "apiProperty")
+    @XmlElement(name = "apiProperty") @Metadata(label = "consumer")
     private List<RestPropertyDefinition> apiProperties = new ArrayList<RestPropertyDefinition>();
 
-    @XmlElement(name = "corsHeaders")
+    @XmlElement(name = "corsHeaders") @Metadata(label = "consumer")
     private List<RestPropertyDefinition> corsHeaders = new ArrayList<RestPropertyDefinition>();
 
     public String getComponent() {
@@ -107,7 +116,7 @@ public class RestConfigurationDefinition {
     }
 
     /**
-     * The Camel Rest component to use for the REST transport, such as restlet, spark-rest.
+     * The Camel Rest component to use for the REST transport (consumer), such as restlet, spark-rest.
      * If no component has been explicit configured, then Camel will lookup if there is a Camel component
      * that integrates with the Rest DSL, or if a org.apache.camel.spi.RestConsumerFactory is registered in the registry.
      * If either one is found, then that is being used.
@@ -125,6 +134,17 @@ public class RestConfigurationDefinition {
      */
     public void setApiComponent(String apiComponent) {
         this.apiComponent = apiComponent;
+    }
+
+    public String getProducerComponent() {
+        return producerComponent;
+    }
+
+    /**
+     * Sets the name of the Camel component to use as the REST producer
+     */
+    public void setProducerComponent(String producerComponent) {
+        this.producerComponent = producerComponent;
     }
 
     public String getScheme() {
@@ -168,6 +188,23 @@ public class RestConfigurationDefinition {
         this.port = port;
     }
 
+    public String getProducerApiDoc() {
+        return producerApiDoc;
+    }
+
+    /**
+     * Sets the location of the api document (swagger api) the REST producer will use
+     * to validate the REST uri and query parameters are valid accordingly to the api document.
+     * This requires adding camel-swagger-java to the classpath, and any miss configuration
+     * will let Camel fail on startup and report the error(s).
+     * <p/>
+     * The location of the api document is loaded from classpath by default, but you can use
+     * <tt>file:</tt> or <tt>http:</tt> to refer to resources to load from file or http url.
+     */
+    public void setProducerApiDoc(String producerApiDoc) {
+        this.producerApiDoc = producerApiDoc;
+    }
+
     public String getContextPath() {
         return contextPath;
     }
@@ -197,6 +234,21 @@ public class RestConfigurationDefinition {
      */
     public void setApiContextPath(String contextPath) {
         this.apiContextPath = contextPath;
+    }
+
+    public String getApiContextRouteId() {
+        return apiContextRouteId;
+    }
+
+    /**
+     * Sets the route id to use for the route that services the REST API.
+     * <p/>
+     * The route will by default use an auto assigned route id.
+     *
+     * @param apiContextRouteId  the route id
+     */
+    public void setApiContextRouteId(String apiContextRouteId) {
+        this.apiContextRouteId = apiContextRouteId;
     }
 
     public String getApiContextIdPattern() {
@@ -245,7 +297,7 @@ public class RestConfigurationDefinition {
     /**
      * Sets the binding mode to use.
      * <p/>
-     * The default value is auto
+     * The default value is off
      */
     public void setBindingMode(RestBindingMode bindingMode) {
         this.bindingMode = bindingMode;
@@ -384,7 +436,7 @@ public class RestConfigurationDefinition {
     //-------------------------------------------------------------------------
 
     /**
-     * To use a specific Camel rest component
+     * To use a specific Camel rest component (consumer)
      */
     public RestConfigurationDefinition component(String componentId) {
         setComponent(componentId);
@@ -396,6 +448,14 @@ public class RestConfigurationDefinition {
      */
     public RestConfigurationDefinition apiComponent(String componentId) {
         setApiComponent(componentId);
+        return this;
+    }
+
+    /**
+     * To use a specific Camel rest component (producer)
+     */
+    public RestConfigurationDefinition producerComponent(String componentId) {
+        setProducerComponent(componentId);
         return this;
     }
 
@@ -432,6 +492,20 @@ public class RestConfigurationDefinition {
     }
 
     /**
+     * Sets the location of the api document (swagger api) the REST producer will use
+     * to validate the REST uri and query parameters are valid accordingly to the api document.
+     * This requires adding camel-swagger-java to the classpath, and any miss configuration
+     * will let Camel fail on startup and report the error(s).
+     * <p/>
+     * The location of the api document is loaded from classpath by default, but you can use
+     * <tt>file:</tt> or <tt>http:</tt> to refer to resources to load from file or http url.
+     */
+    public RestConfigurationDefinition producerApiDoc(String apiDoc) {
+        setProducerApiDoc(apiDoc);
+        return this;
+    }
+
+    /**
      * Sets a leading context-path the REST services will be using.
      * <p/>
      * This can be used when using components such as <tt>camel-servlet</tt> where the deployed web application
@@ -440,6 +514,14 @@ public class RestConfigurationDefinition {
      */
     public RestConfigurationDefinition apiContextPath(String contextPath) {
         setApiContextPath(contextPath);
+        return this;
+    }
+
+    /**
+     * Sets the route id to use for the route that services the REST API.
+     */
+    public RestConfigurationDefinition apiContextRouteId(String routeId) {
+        setApiContextRouteId(routeId);
         return this;
     }
 
@@ -531,6 +613,8 @@ public class RestConfigurationDefinition {
 
     /**
      * For additional configuration options on component level
+     * <p/>
+     * The value can use <tt>#</tt> to refer to a bean to lookup in the registry.
      */
     public RestConfigurationDefinition componentProperty(String key, String value) {
         RestPropertyDefinition prop = new RestPropertyDefinition();
@@ -542,6 +626,8 @@ public class RestConfigurationDefinition {
 
     /**
      * For additional configuration options on endpoint level
+     * <p/>
+     * The value can use <tt>#</tt> to refer to a bean to lookup in the registry.
      */
     public RestConfigurationDefinition endpointProperty(String key, String value) {
         RestPropertyDefinition prop = new RestPropertyDefinition();
@@ -553,6 +639,8 @@ public class RestConfigurationDefinition {
 
     /**
      * For additional configuration options on consumer level
+     * <p/>
+     * The value can use <tt>#</tt> to refer to a bean to lookup in the registry.
      */
     public RestConfigurationDefinition consumerProperty(String key, String value) {
         RestPropertyDefinition prop = new RestPropertyDefinition();
@@ -564,6 +652,8 @@ public class RestConfigurationDefinition {
 
     /**
      * For additional configuration options on data format level
+     * <p/>
+     * The value can use <tt>#</tt> to refer to a bean to lookup in the registry.
      */
     public RestConfigurationDefinition dataFormatProperty(String key, String value) {
         RestPropertyDefinition prop = new RestPropertyDefinition();
@@ -574,7 +664,7 @@ public class RestConfigurationDefinition {
     }
 
     /**
-     * For additional configuration options on data format level
+     * For configuring an api property, such as <tt>api.title</tt>, or <tt>api.version</tt>.
      */
     public RestConfigurationDefinition apiProperty(String key, String value) {
         RestPropertyDefinition prop = new RestPropertyDefinition();
@@ -613,6 +703,9 @@ public class RestConfigurationDefinition {
         if (apiComponent != null) {
             answer.setApiComponent(CamelContextHelper.parseText(context, apiComponent));
         }
+        if (producerComponent != null) {
+            answer.setProducerComponent(CamelContextHelper.parseText(context, producerComponent));
+        }
         if (scheme != null) {
             answer.setScheme(CamelContextHelper.parseText(context, scheme));
         }
@@ -622,8 +715,14 @@ public class RestConfigurationDefinition {
         if (port != null) {
             answer.setPort(CamelContextHelper.parseInteger(context, port));
         }
+        if (producerApiDoc != null) {
+            answer.setProducerApiDoc(CamelContextHelper.parseText(context, producerApiDoc));
+        }
         if (apiContextPath != null) {
             answer.setApiContextPath(CamelContextHelper.parseText(context, apiContextPath));
+        }
+        if (apiContextRouteId != null) {
+            answer.setApiContextRouteId(CamelContextHelper.parseText(context, apiContextRouteId));
         }
         if (apiContextIdPattern != null) {
             // special to allow #name# to refer to itself

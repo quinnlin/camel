@@ -154,14 +154,13 @@ public class XsltAggregationStrategy implements AggregationStrategy {
         }
 
         if (uriResolver == null) {
-            uriResolver = new XsltUriResolver(context.getClassResolver(), xslFile);
+            uriResolver = new XsltUriResolver(context, xslFile);
         }
 
         xslt.setUriResolver(uriResolver);
         xslt.setFailOnNullBody(true);
         xslt.transformerCacheSize(0);
         xslt.setAllowStAX(true);
-        xslt.setCamelContext(context);
 
         configureOutput(xslt, output.name());
         loadResource(xslFile);

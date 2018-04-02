@@ -63,7 +63,7 @@ public final class URISupport {
      * Removes detected sensitive information (such as passwords) from the URI and returns the result.
      *
      * @param uri The uri to sanitize.
-     * @see #SECRETS for the matched pattern
+     * @see #SECRETS and #USERINFO_PASSWORD for the matched pattern
      *
      * @return Returns null if the uri is null, otherwise the URI with the passphrase, password or secretKey sanitized.
      */
@@ -583,7 +583,7 @@ public final class URISupport {
         } else {
             // reorder parameters a..z
             List<String> keys = new ArrayList<String>(parameters.keySet());
-            Collections.sort(keys);
+            keys.sort(null);
 
             Map<String, Object> sorted = new LinkedHashMap<String, Object>(parameters.size());
             for (String key : keys) {
@@ -600,4 +600,22 @@ public final class URISupport {
         // must include :// to do a correct URI all components can work with
         return scheme + "://" + path + (query != null ? "?" + query : "");
     }
+
+    public static Map<String, Object> extractProperties(Map<String, Object> properties, String optionPrefix) {
+        Map<String, Object> rc = new LinkedHashMap<String, Object>(properties.size());
+
+        for (Iterator<Map.Entry<String, Object>> it = properties.entrySet().iterator(); it.hasNext();) {
+            Map.Entry<String, Object> entry = it.next();
+            String name = entry.getKey();
+            if (name.startsWith(optionPrefix)) {
+                Object value = properties.get(name);
+                name = name.substring(optionPrefix.length());
+                rc.put(name, value);
+                it.remove();
+            }
+        }
+
+        return rc;
+    }
+
 }

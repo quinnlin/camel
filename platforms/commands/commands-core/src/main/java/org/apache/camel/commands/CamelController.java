@@ -66,12 +66,13 @@ public interface CamelController {
      * Browses the inflight exchanges
      *
      * @param camelContextName        the Camel context.
+     * @param route                   the Camel route ID
      * @param limit                   maximum number of exchanges to return
      * @param sortByLongestDuration   <tt>true</tt> to sort by longest duration, <tt>false</tt> to sort by exchange id
      * @return a list of key/value pairs with inflight exchange information
      * @throws java.lang.Exception can be thrown
      */
-    List<Map<String, Object>> browseInflightExchanges(String camelContextName, int limit, boolean sortByLongestDuration) throws Exception;
+    List<Map<String, Object>> browseInflightExchanges(String camelContextName, String route, int limit, boolean sortByLongestDuration) throws Exception;
 
     /**
      * Starts the given Camel context.
@@ -284,6 +285,15 @@ public interface CamelController {
     Map<String, Set<String>> listEipsLabelCatalog() throws Exception;
 
     /**
+     * Collects information about a Camel component from catalog
+     *
+     * @param name the component name
+     * @return a map of key/value pairs with component information
+     * @throws java.lang.Exception can be thrown
+     */
+    Map<String, Object> componentInfo(String name) throws Exception;
+
+    /**
      * Lists all components from the Camel components catalog
      *
      * @param filter optional filter to filter by labels
@@ -333,5 +343,29 @@ public interface CamelController {
      * @throws java.lang.Exception can be thrown
      */
     Map<String, Set<String>> listLanguagesLabelCatalog() throws Exception;
+
+    /**
+     * Gets the component ascii documentation from the Camel catalog.
+     *
+     * @param name the name of the component
+     * @throws java.lang.Exception can be thrown
+     */
+    String catalogComponentAsciiDoc(String name) throws Exception;
+
+    /**
+     * Gets the data format ascii documentation from the Camel catalog.
+     *
+     * @param name the name of the data format
+     * @throws java.lang.Exception can be thrown
+     */
+    String catalogDataFormatAsciiDoc(String name) throws Exception;
+
+    /**
+     * Gets the language ascii documentation from the Camel catalog.
+     *
+     * @param name the name of the language
+     * @throws java.lang.Exception can be thrown
+     */
+    String catalogLanguageAsciiDoc(String name) throws Exception;
 
 }

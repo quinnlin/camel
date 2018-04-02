@@ -20,6 +20,7 @@ import java.io.File;
 import java.util.Map;
 
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.group.ChannelGroup;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.camel.spi.Metadata;
 import org.apache.camel.spi.UriParam;
@@ -47,7 +48,7 @@ public class NettyServerBootstrapConfiguration implements Cloneable {
     protected int receiveBufferSizePredictor;
     @UriParam(label = "consumer,advanced", defaultValue = "1")
     protected int bossCount = 1;
-    @UriParam(label = "consumer,advanced")
+    @UriParam(label = "advanced")
     protected int workerCount;
     @UriParam(defaultValue = "true")
     protected boolean keepAlive = true;
@@ -63,6 +64,7 @@ public class NettyServerBootstrapConfiguration implements Cloneable {
     protected ServerInitializerFactory serverInitializerFactory;
     @UriParam(label = "consumer,advanced")
     protected NettyServerBootstrapFactory nettyServerBootstrapFactory;
+    @UriParam(label = "advanced", prefix = "option.", multiValue = true)
     protected Map<String, Object> options;
     // SSL options is also part of the server bootstrap as the server listener on port X is either plain or SSL
     @UriParam(label = "security")
@@ -91,10 +93,14 @@ public class NettyServerBootstrapConfiguration implements Cloneable {
     protected String enabledProtocols = DEFAULT_ENABLED_PROTOCOLS;
     @UriParam(label = "security")
     protected String passphrase;
+    @UriParam(label = "advanced")
+    protected boolean nativeTransport;
     @UriParam(label = "consumer,advanced")
     protected EventLoopGroup bossGroup;
-    @UriParam(label = "consumer,advanced")
+    @UriParam(label = "advanced")
     protected EventLoopGroup workerGroup;
+    @UriParam(label = "advanced")
+    protected ChannelGroup channelGroup;
     @UriParam(label = "consumer,advanced")
     protected String networkInterface;
     @UriParam(label = "consumer", defaultValue = "true")
@@ -461,6 +467,18 @@ public class NettyServerBootstrapConfiguration implements Cloneable {
         this.options = options;
     }
 
+    public boolean isNativeTransport() {
+        return nativeTransport;
+    }
+
+    /**
+     * Whether to use native transport instead of NIO. Native transport takes advantage of the host operating system and is only supported on some platforms.
+     * You need to add the netty JAR for the host operating system you are using. See more details at: http://netty.io/wiki/native-transports.html
+     */
+    public void setNativeTransport(boolean nativeTransport) {
+        this.nativeTransport = nativeTransport;
+    }
+
     public EventLoopGroup getBossGroup() {
         return bossGroup;
     }
@@ -471,17 +489,28 @@ public class NettyServerBootstrapConfiguration implements Cloneable {
     public void setBossGroup(EventLoopGroup bossGroup) {
         this.bossGroup = bossGroup;
     }
-    
+
     public EventLoopGroup getWorkerGroup() {
         return workerGroup;
     }
 
     /**
      * To use a explicit EventLoopGroup as the boss thread pool.
-     * For example to share a thread pool with multiple consumers. By default each consumer has their own boss pool with 1 core thread.
+     * For example to share a thread pool with multiple consumers or producers. By default each consumer or producer has their own worker pool with 2 x cpu count core threads.
      */
     public void setWorkerGroup(EventLoopGroup workerGroup) {
         this.workerGroup = workerGroup;
+    }
+
+    public ChannelGroup getChannelGroup() {
+        return channelGroup;
+    }
+
+    /**
+     * To use a explicit ChannelGroup.
+     */
+    public void setChannelGroup(ChannelGroup channelGroup) {
+        this.channelGroup = channelGroup;
     }
 
     public String getNetworkInterface() {

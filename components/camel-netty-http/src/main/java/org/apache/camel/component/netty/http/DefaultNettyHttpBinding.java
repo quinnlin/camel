@@ -132,7 +132,7 @@ public class DefaultNettyHttpBinding implements NettyHttpBinding, Cloneable {
         headers.put(Exchange.HTTP_RAW_QUERY, uri.getRawQuery());
 
         // strip the starting endpoint path so the path is relative to the endpoint uri
-        String path = uri.getPath();
+        String path = uri.getRawPath();
         if (configuration.getPath() != null) {
             // need to match by lower case as we want to ignore case on context-path
             String matchPath = path.toLowerCase(Locale.US);
@@ -529,8 +529,7 @@ public class DefaultNettyHttpBinding implements NettyHttpBinding, Cloneable {
         // must include HOST header as required by HTTP 1.1
         // use URI as its faster than URL (no DNS lookup)
         URI u = new URI(uri);
-        String hostHeader = u.getHost() 
-                + (configuration.isUseRelativePath() ? ":" + u.getPort() : "");
+        String hostHeader = u.getHost() + (u.getPort() == 80 ? "" : ":" + u.getPort());
         request.headers().set(HttpHeaders.Names.HOST, hostHeader);
         LOG.trace("Host: {}", hostHeader);
 

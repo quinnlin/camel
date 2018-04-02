@@ -23,16 +23,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.camel.CamelContext;
 import org.apache.camel.Endpoint;
+import org.apache.camel.Producer;
 import org.apache.camel.ResolveEndpointFailedException;
 import org.apache.camel.http.common.HttpBinding;
 import org.apache.camel.http.common.HttpCommonComponent;
 import org.apache.camel.http.common.HttpConfiguration;
 import org.apache.camel.http.common.HttpHelper;
+import org.apache.camel.http.common.HttpRestHeaderFilterStrategy;
 import org.apache.camel.http.common.UrlRewrite;
 import org.apache.camel.spi.HeaderFilterStrategy;
+import org.apache.camel.spi.RestProducerFactory;
+import org.apache.camel.util.FileUtil;
 import org.apache.camel.util.IntrospectionSupport;
 import org.apache.camel.util.ObjectHelper;
+import org.apache.camel.util.ServiceHelper;
 import org.apache.camel.util.URISupport;
 import org.apache.camel.util.UnsafeUriCharactersEncoder;
 import org.apache.camel.util.jsse.SSLContextParameters;
@@ -59,7 +65,7 @@ import org.slf4j.LoggerFactory;
  *
  * @version 
  */
-public class HttpComponent extends HttpCommonComponent {
+public class HttpComponent extends HttpCommonComponent implements RestProducerFactory {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpComponent.class);
 
@@ -94,16 +100,10 @@ public class HttpComponent extends HttpCommonComponent {
      */
     protected HttpClientConfigurer createHttpClientConfigurer(Map<String, Object> parameters, boolean secure) throws Exception {
         // prefer to use endpoint configured over component configured
-        // TODO cmueller: remove the "httpClientConfigurerRef" look up in Camel 3.0
-        HttpClientConfigurer configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurerRef", HttpClientConfigurer.class);
+        HttpClientConfigurer configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurer", HttpClientConfigurer.class);
         if (configurer == null) {
-            // try without ref
-            configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurer", HttpClientConfigurer.class);
-            
-            if (configurer == null) {
-                // fallback to component configured
-                configurer = getHttpClientConfigurer();
-            }
+            // fallback to component configured
+            configurer = getHttpClientConfigurer();
         }
 
         configurer = configureBasicAuthentication(parameters, configurer);
@@ -158,38 +158,25 @@ public class HttpComponent extends HttpCommonComponent {
         // http client can be configured from URI options
         HttpClientBuilder clientBuilder = HttpClientBuilder.create();
         // allow the builder pattern
-        IntrospectionSupport.setProperties(clientBuilder, parameters, "httpClient.", true);
+        Map<String, Object> httpClientOptions = IntrospectionSupport.extractProperties(parameters, "httpClient.");
+        IntrospectionSupport.setProperties(clientBuilder, httpClientOptions);
         // set the Request configure this way and allow the builder pattern
         RequestConfig.Builder requestConfigBuilder = RequestConfig.custom();
-        IntrospectionSupport.setProperties(requestConfigBuilder, parameters, "httpClient.", true);
+        IntrospectionSupport.setProperties(requestConfigBuilder, httpClientOptions);
         clientBuilder.setDefaultRequestConfig(requestConfigBuilder.build());
         
         // validate that we could resolve all httpClient. parameters as this component is lenient
-        validateParameters(uri, parameters, "httpClient.");
+        validateParameters(uri, httpClientOptions, null);
         
-        // TODO cmueller: remove the "httpBindingRef" look up in Camel 3.0
-        HttpBinding httpBinding = resolveAndRemoveReferenceParameter(parameters, "httpBindingRef", HttpBinding.class);
-        if (httpBinding == null) {
-            httpBinding = resolveAndRemoveReferenceParameter(parameters, "httpBinding", HttpBinding.class);
-        }
-
-        // TODO cmueller: remove the "httpContextRef" look up in Camel 3.0
-        HttpContext httpContext = resolveAndRemoveReferenceParameter(parameters, "httpContextRef", HttpContext.class);
-        if (httpContext == null) {
-            httpContext = resolveAndRemoveReferenceParameter(parameters, "httpContext", HttpContext.class);
-        }
+        HttpBinding httpBinding = resolveAndRemoveReferenceParameter(parameters, "httpBinding", HttpBinding.class);
+        HttpContext httpContext = resolveAndRemoveReferenceParameter(parameters, "httpContext", HttpContext.class);
 
         X509HostnameVerifier x509HostnameVerifier = resolveAndRemoveReferenceParameter(parameters, "x509HostnameVerifier", X509HostnameVerifier.class);
         if (x509HostnameVerifier == null) {
             x509HostnameVerifier = getX509HostnameVerifier();
         }
-        
 
-        // TODO cmueller: remove the "sslContextParametersRef" look up in Camel 3.0
-        SSLContextParameters sslContextParameters = resolveAndRemoveReferenceParameter(parameters, "sslContextParametersRef", SSLContextParameters.class);
-        if (sslContextParameters == null) {
-            sslContextParameters = resolveAndRemoveReferenceParameter(parameters, "sslContextParameters", SSLContextParameters.class);
-        }
+        SSLContextParameters sslContextParameters = resolveAndRemoveReferenceParameter(parameters, "sslContextParameters", SSLContextParameters.class);
         if (sslContextParameters == null) {
             sslContextParameters = getSslContextParameters();
         }
@@ -289,6 +276,7 @@ public class HttpComponent extends HttpCommonComponent {
         if (endpoint.getCookieStore() == null) {
             endpoint.setCookieStore(getCookieStore());
         }
+        endpoint.setHttpClientOptions(httpClientOptions);
         
         return endpoint;
     }
@@ -300,8 +288,8 @@ public class HttpComponent extends HttpCommonComponent {
         builder.register("http", PlainConnectionSocketFactory.getSocketFactory());
         builder.register("http4", PlainConnectionSocketFactory.getSocketFactory());
         if (sslContextParams != null) {
-            builder.register("https", new SSLConnectionSocketFactory(sslContextParams.createSSLContext(), x509HostnameVerifier));
-            builder.register("https4", new SSLConnectionSocketFactory(sslContextParams.createSSLContext(), x509HostnameVerifier));
+            builder.register("https", new SSLConnectionSocketFactory(sslContextParams.createSSLContext(getCamelContext()), x509HostnameVerifier));
+            builder.register("https4", new SSLConnectionSocketFactory(sslContextParams.createSSLContext(getCamelContext()), x509HostnameVerifier));
         } else {
             builder.register("https4", new SSLConnectionSocketFactory(SSLContexts.createDefault(), x509HostnameVerifier));
             builder.register("https", new SSLConnectionSocketFactory(SSLContexts.createDefault(), x509HostnameVerifier));
@@ -335,11 +323,45 @@ public class HttpComponent extends HttpCommonComponent {
 
         return answer;
     }
-    
 
     @Override
     protected boolean useIntrospectionOnEndpoint() {
         return false;
+    }
+
+
+    @Override
+    public Producer createProducer(CamelContext camelContext, String host,
+                                   String verb, String basePath, String uriTemplate, String queryParameters,
+                                   String consumes, String produces, Map<String, Object> parameters) throws Exception {
+
+        // avoid leading slash
+        basePath = FileUtil.stripLeadingSeparator(basePath);
+        uriTemplate = FileUtil.stripLeadingSeparator(uriTemplate);
+
+        // replace http with http4 in the host part
+        host = host.replace("http", "http4");
+
+        // get the endpoint
+        String url;
+        if (uriTemplate != null) {
+
+            url = String.format("%s/%s/%s", host, basePath, uriTemplate);
+        } else {
+            url = String.format("%s/%s", host, basePath);
+        }
+
+        HttpEndpoint endpoint = camelContext.getEndpoint(url, HttpEndpoint.class);
+        if (parameters != null && !parameters.isEmpty()) {
+            setProperties(camelContext, endpoint, parameters);
+        }
+        String path = uriTemplate != null ? uriTemplate : basePath;
+        endpoint.setHeaderFilterStrategy(new HttpRestHeaderFilterStrategy(path, queryParameters));
+
+        // the endpoint must be started before creating the producer
+        ServiceHelper.startService(endpoint);
+
+        return endpoint.createProducer();
     }
 
     public HttpClientConfigurer getHttpClientConfigurer() {
@@ -379,6 +401,18 @@ public class HttpComponent extends HttpCommonComponent {
     public void setHttpConfiguration(HttpConfiguration httpConfiguration) {
         // need to override and call super for component docs
         super.setHttpConfiguration(httpConfiguration);
+    }
+
+    /**
+     * Whether to allow java serialization when a request uses context-type=application/x-java-serialized-object
+     * <p/>
+     * This is by default turned off. If you enable this then be aware that Java will deserialize the incoming
+     * data from the request to Java and that can be a potential security risk.
+     */
+    @Override
+    public void setAllowJavaSerializedObject(boolean allowJavaSerializedObject) {
+        // need to override and call super for component docs
+        super.setAllowJavaSerializedObject(allowJavaSerializedObject);
     }
 
     public HttpContext getHttpContext() {

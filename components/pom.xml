@@ -14,14 +14,15 @@
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   See the License for the specific language governing permissions and
   limitations under the License.
---><project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
     <groupId>org.apache.camel</groupId>
     <artifactId>camel-parent</artifactId>
-    <version>2.16.1-SNAPSHOT</version>
+    <version>2.19.0-SNAPSHOT</version>
     <relativePath>../parent</relativePath>
   </parent>
 
@@ -35,22 +36,23 @@
     <module>camel-test</module>
     <module>camel-testng</module>
     <module>camel-test-blueprint</module>
+    <module>camel-test-cdi</module>
+    <module>camel-test-karaf</module>
     <module>camel-test-spring</module>
-    <module>camel-test-spring3</module>
-    <module>camel-test-spring40</module>
     <module>camel-core-osgi</module>
     <module>camel-core-xml</module>
     <module>camel-blueprint</module>
     <module>camel-spring</module>
+    <module>camel-spring-dm</module>
     <module>camel-bam</module>
     <module>camel-groovy</module>
     <module>camel-scala</module>
     <module>camel-http-common</module>
     <module>camel-http</module>
     <module>camel-http4</module>
+    <module>camel-hystrix</module>
     <module>camel-jetty-common</module>
     <module>camel-jetty</module>
-    <module>camel-jetty8</module>
     <module>camel-jetty9</module>
     <module>camel-cxf</module>
     <module>camel-cxf-transport</module>
@@ -61,6 +63,7 @@
     <module>camel-ahc-ws</module>
     <module>camel-amqp</module>
     <module>camel-apns</module>
+    <module>camel-asterisk</module>
     <module>camel-atmos</module>
     <module>camel-atmosphere-websocket</module>
     <module>camel-atom</module>
@@ -72,16 +75,21 @@
     <module>camel-bean-validator</module>
     <module>camel-barcode</module>
     <module>camel-bindy</module>
+    <module>camel-bonita</module>
     <module>camel-boon</module>
     <module>camel-box</module>
+    <module>camel-braintree</module>
     <module>camel-cache</module>
     <module>camel-cassandraql</module>
     <module>camel-castor</module>
     <module>camel-cdi</module>
+    <module>camel-chronicle</module>
     <module>camel-chunk</module>
+    <module>camel-cm-sms</module>
     <module>camel-cmis</module>
     <module>camel-coap</module>
     <module>camel-cometd</module>
+    <module>camel-consul</module>
     <module>camel-context</module>
     <module>camel-couchdb</module>
     <module>camel-crypto</module>
@@ -90,18 +98,22 @@
     <module>camel-dns</module>
     <module>camel-docker</module>
     <module>camel-dozer</module>
+    <module>camel-drill</module>
     <module>camel-dropbox</module>
     <module>camel-eclipse</module>
+    <module>camel-ehcache</module>
     <module>camel-ejb</module>
     <module>camel-elasticsearch</module>
+    <module>camel-elsql</module>
+    <module>camel-etcd</module>
     <module>camel-eventadmin</module>
     <module>camel-exec</module>
     <module>camel-facebook</module>
     <module>camel-flatpack</module>
+    <module>camel-flink</module>
     <module>camel-fop</module>
     <module>camel-freemarker</module>
     <module>camel-ftp</module>
-    <module>camel-gae</module>
     <module>camel-ganglia</module>
     <module>camel-geocoder</module>
     <module>camel-git</module>
@@ -109,6 +121,7 @@
     <module>camel-google-calendar</module>
     <module>camel-google-drive</module>
     <module>camel-google-mail</module>
+    <module>camel-google-pubsub</module>
     <module>camel-gora</module>
     <module>camel-grape</module>
     <module>camel-gson</module>
@@ -119,17 +132,23 @@
     <module>camel-hbase</module>
     <module>camel-hdfs</module>
     <module>camel-hdfs2</module>
+    <module>camel-hessian</module>
     <module>camel-hipchat</module>
     <module>camel-hl7</module>
     <module>camel-ibatis</module>
     <module>camel-ical</module>
+    <module>camel-ignite</module>
     <module>camel-infinispan</module>
+    <module>camel-influxdb</module>
     <module>camel-irc</module>
+    <module>camel-ironmq</module>
     <module>camel-jackson</module>
+    <module>camel-jacksonxml</module>
     <module>camel-javaspace</module>
     <module>camel-jaxb</module>
     <module>camel-jasypt</module>
     <module>camel-jbpm</module>
+    <module>camel-jcache</module>
     <module>camel-jclouds</module>
     <module>camel-jcr</module>
     <module>camel-jdbc</module>
@@ -140,6 +159,7 @@
     <module>camel-jira</module>
     <module>camel-jmx</module>
     <module>camel-jolt</module>
+    <module>camel-johnzon</module>
     <module>camel-josql</module>
     <module>camel-jpa</module>
     <module>camel-jsonpath</module>
@@ -150,22 +170,28 @@
     <module>camel-kafka</module>
     <module>camel-kestrel</module>
     <module>camel-krati</module>
+    <module>camel-kubernetes</module>
     <module>camel-kura</module>
     <module>camel-ldap</module>
     <module>camel-leveldb</module>
     <module>camel-linkedin</module>
     <module>camel-lucene</module>
+    <module>camel-lumberjack</module>
+    <module>camel-lzf</module>
     <module>camel-mail</module>
     <module>camel-metrics</module>
     <module>camel-mina</module>
     <module>camel-mina2</module>
+    <module>camel-mllp</module>
     <module>camel-mongodb</module>
+    <module>camel-mongodb-gridfs</module>
     <module>camel-mqtt</module>
     <module>camel-msv</module>
     <module>camel-mustache</module>
     <module>camel-mvel</module>
     <module>camel-mybatis</module>
     <module>camel-nagios</module>
+    <module>camel-nats</module>
     <module>camel-netty</module>
     <module>camel-netty4</module>
     <module>camel-netty-http</module>
@@ -173,6 +199,7 @@
     <module>camel-ognl</module>
     <module>camel-olingo2</module>
     <module>camel-openshift</module>
+    <module>camel-openstack</module>
     <module>camel-optaplanner</module>
     <module>camel-paho</module>
     <module>camel-paxlogging</module>
@@ -185,6 +212,7 @@
     <module>camel-quickfix</module>
     <module>camel-rabbitmq</module>
     <module>camel-restlet</module>
+    <module>camel-ribbon</module>
     <module>camel-rmi</module>
     <module>camel-routebox</module>
     <module>camel-rss</module>
@@ -196,16 +224,19 @@
     <module>camel-schematron</module>
     <module>camel-scr</module>
     <module>camel-script</module>
+    <module>camel-servicenow</module>
     <module>camel-servlet</module>
     <module>camel-servletlistener</module>
     <module>camel-shiro</module>
     <module>camel-sip</module>
     <module>camel-smpp</module>
+    <module>camel-snakeyaml</module>
     <module>camel-snmp</module>
     <module>camel-sjms</module>
     <module>camel-slack</module>
     <module>camel-soap</module>
     <module>camel-solr</module>
+    <module>camel-spark</module>
     <module>camel-spark-rest</module>
     <module>camel-splunk</module>
     <module>camel-spring-batch</module>
@@ -227,6 +258,7 @@
     <module>camel-swagger-java</module>
     <module>camel-tagsoup</module>
     <module>camel-tarfile</module>
+    <module>camel-telegram</module>
     <module>camel-twitter</module>
     <module>camel-undertow</module>
     <module>camel-univocity-parsers</module>
@@ -243,6 +275,7 @@
     <module>camel-xstream</module>
     <module>camel-yammer</module>
     <module>camel-zipfile</module>
+    <module>camel-zipkin</module>
     <module>camel-zookeeper</module>
   </modules>
 
@@ -253,6 +286,10 @@
         <groupId>org.apache.camel</groupId>
         <artifactId>camel-package-maven-plugin</artifactId>
         <version>${project.version}</version>
+        <configuration>
+            <!-- set to true to make build fail fast if missing documentation in docs files -->
+            <failFast>false</failFast>
+        </configuration>
         <executions>
           <execution>
             <id>prepare</id>
@@ -260,14 +297,23 @@
               <goal>prepare-components</goal>
             </goals>
             <phase>generate-resources</phase>
-         </execution>
+          </execution>
           <execution>
             <id>validate</id>
             <goals>
               <goal>validate-components</goal>
+              <goal>prepare-spring-boot-starter</goal>
+              <goal>prepare-spring-boot-auto-configuration</goal>
             </goals>
             <phase>prepare-package</phase>
-         </execution>
+          </execution>
+          <execution>
+            <id>readme</id>
+            <goals>
+              <goal>update-readme</goal>
+            </goals>
+            <phase>package</phase>
+          </execution>
         </executions>
       </plugin>
     </plugins>
@@ -284,7 +330,7 @@
       </activation>
 
       <dependencies>
-        <!-- enable the APT processor -->
+        <!-- enable Camel APT processors -->
         <dependency>
           <groupId>org.apache.camel</groupId>
           <artifactId>apt</artifactId>
@@ -293,5 +339,26 @@
         </dependency>
       </dependencies>
     </profile>
+    <profile>
+      <id>validate</id>
+      <build>
+        <plugins>           
+          <!-- to validate Camel endpoints: mvn camel:validate -Pvalidate -->
+          <plugin>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-maven-plugin</artifactId>
+            <version>${project.version}</version>
+            <configuration>
+              <failOnError>false</failOnError>
+              <includeTest>true</includeTest>
+              <includeXml>true</includeXml>
+              <ignoreLenientProperties>false</ignoreLenientProperties>
+              <excludes>.*custom-exchange-formatter-context\.xml</excludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
   </profiles>
+
 </project>

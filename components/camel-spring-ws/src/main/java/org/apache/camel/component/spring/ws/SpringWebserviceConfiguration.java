@@ -22,7 +22,6 @@ import java.net.URISyntaxException;
 import org.apache.camel.component.spring.ws.bean.CamelEndpointDispatcher;
 import org.apache.camel.component.spring.ws.bean.CamelSpringWSEndpointMapping;
 import org.apache.camel.component.spring.ws.filter.MessageFilter;
-import org.apache.camel.component.spring.ws.filter.impl.BasicMessageFilter;
 import org.apache.camel.component.spring.ws.type.EndpointMappingKey;
 import org.apache.camel.converter.jaxp.XmlConverter;
 import org.apache.camel.spi.UriParam;
@@ -71,6 +70,8 @@ public class SpringWebserviceConfiguration {
     private MessageIdStrategy messageIdStrategy;
     @UriParam(label = "producer")
     private int timeout = -1;
+    @UriParam(label = "producer")
+    private boolean allowResponseHeaderOverride;
 
     /* Consumer configuration */
     @UriParam(label = "consumer")
@@ -381,5 +382,24 @@ public class SpringWebserviceConfiguration {
     public void setMessageIdStrategy(MessageIdStrategy messageIdStrategy) {
         this.messageIdStrategy = messageIdStrategy;
     }
-    
+
+    /**
+     * @return boolean - true, will override header with spring-ws response message header
+     */
+    public boolean isAllowResponseHeaderOverride() {
+        return allowResponseHeaderOverride;
+    }
+
+    /**
+     * Option to override soap response header in in/out exchange with header info from the actual service layer.
+     * If the invoked service appends or rewrites the soap header this option when set to true, allows the modified
+     * soap header to be overwritten in in/out message headers
+     * 
+     * @param allowResponseHeaderOverride
+     *            - true, will override header with spring-ws response message header
+     */
+    public void setAllowResponseHeaderOverride(boolean allowResponseHeaderOverride) {
+        this.allowResponseHeaderOverride = allowResponseHeaderOverride;
+    }
+
 }

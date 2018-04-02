@@ -16,27 +16,33 @@
  */
 package org.apache.camel.example.spring.boot;
 
-import org.apache.camel.EndpointInject;
-import org.apache.camel.component.mock.MockEndpoint;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.camel.CamelContext;
+import org.apache.camel.builder.NotifyBuilder;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.springframework.boot.test.SpringApplicationConfiguration;
-import org.springframework.boot.test.WebIntegrationTest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 @RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = MySpringBootRouter.class)
-@WebIntegrationTest(randomPort = true)
+@SpringBootTest(classes = MySpringBootRouter.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@EnableAutoConfiguration
 public class MySpringBootRouterTest extends Assert {
 
-    @EndpointInject(uri = "mock:test")
-    MockEndpoint mockEndpoint;
+    @Autowired
+    CamelContext camelContext;
 
     @Test
     public void shouldProduceMessages() throws InterruptedException {
-        mockEndpoint.setExpectedCount(1);
-        mockEndpoint.assertIsSatisfied();
+        // we expect that a number of messages is automatic done by the Camel
+        // route as it uses a timer to trigger
+        NotifyBuilder notify = new NotifyBuilder(camelContext).whenDone(4).create();
+
+        assertTrue(notify.matches(10, TimeUnit.SECONDS));
     }
 
 }

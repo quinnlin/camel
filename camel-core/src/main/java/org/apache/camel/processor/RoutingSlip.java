@@ -17,8 +17,6 @@
 package org.apache.camel.processor;
 
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 import org.apache.camel.AsyncCallback;
 import org.apache.camel.AsyncProcessor;
@@ -41,11 +39,9 @@ import org.apache.camel.impl.ProducerCache;
 import org.apache.camel.spi.EndpointUtilizationStatistics;
 import org.apache.camel.spi.IdAware;
 import org.apache.camel.spi.RouteContext;
-import org.apache.camel.spi.UnitOfWork;
 import org.apache.camel.support.ServiceSupport;
 import org.apache.camel.util.AsyncProcessorHelper;
 import org.apache.camel.util.ExchangeHelper;
-import org.apache.camel.util.KeyValueHolder;
 import org.apache.camel.util.MessageHelper;
 import org.apache.camel.util.ObjectHelper;
 import org.apache.camel.util.ServiceHelper;
@@ -74,20 +70,6 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
     protected Expression expression;
     protected String uriDelimiter;
     protected final CamelContext camelContext;
-    private final ConcurrentMap<PreparedErrorHandler, AsyncProcessor> errorHandlers = new ConcurrentHashMap<PreparedErrorHandler, AsyncProcessor>();
-
-    /**
-     * Class that represents prepared fine grained error handlers when processing routingslip/dynamic-router exchanges
-     * <p/>
-     * This is similar to how multicast processor does.
-     */
-    static final class PreparedErrorHandler extends KeyValueHolder<RouteContext, Processor> {
-
-        public PreparedErrorHandler(RouteContext key, Processor value) {
-            super(key, value);
-        }
-
-    }
 
     /**
      * The iterator to be used for retrieving the next routing slip(s) to be used.
@@ -183,25 +165,25 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
             return true;
         }
 
-        return doRoutingSlip(exchange, callback);
+        return doRoutingSlipWithExpression(exchange, this.expression, callback);
     }
 
     public boolean doRoutingSlip(Exchange exchange, Object routingSlip, AsyncCallback callback) {
         if (routingSlip instanceof Expression) {
-            this.expression = (Expression) routingSlip;
+            return doRoutingSlipWithExpression(exchange, (Expression) routingSlip, callback);
         } else {
-            this.expression = ExpressionBuilder.constantExpression(routingSlip);
+            return doRoutingSlipWithExpression(exchange, ExpressionBuilder.constantExpression(routingSlip), callback);
         }
-        return doRoutingSlip(exchange, callback);
     }
 
     /**
      * Creates the route slip iterator to be used.
      *
      * @param exchange the exchange
+     * @param expression the expression
      * @return the iterator, should never be <tt>null</tt>
      */
-    protected RoutingSlipIterator createRoutingSlipIterator(final Exchange exchange) throws Exception {
+    protected RoutingSlipIterator createRoutingSlipIterator(final Exchange exchange, final Expression expression) throws Exception {
         Object slip = expression.evaluate(exchange, Object.class);
         if (exchange.getException() != null) {
             // force any exceptions occurred during evaluation to be thrown
@@ -221,11 +203,11 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
         };
     }
 
-    private boolean doRoutingSlip(final Exchange exchange, final AsyncCallback callback) {
+    private boolean doRoutingSlipWithExpression(final Exchange exchange, final Expression expression, final AsyncCallback callback) {
         Exchange current = exchange;
         RoutingSlipIterator iter;
         try {
-            iter = createRoutingSlipIterator(exchange);
+            iter = createRoutingSlipIterator(exchange, expression);
         } catch (Exception e) {
             exchange.setException(e);
             callback.done(true);
@@ -325,7 +307,7 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
         return copy;
     }
 
-    protected AsyncProcessor createErrorHandler(RouteContext routeContext, Exchange exchange, AsyncProcessor processor) {
+    protected AsyncProcessor createErrorHandler(RouteContext routeContext, Exchange exchange, AsyncProcessor processor, Endpoint endpoint) {
         AsyncProcessor answer = processor;
 
         boolean tryBlock = exchange.getProperty(Exchange.TRY_ROUTE_BLOCK, false, boolean.class);
@@ -337,16 +319,6 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
             // this is needed to support redelivery on that output alone and not doing redelivery
             // for the entire routingslip/dynamic-router block again which will start from scratch again
 
-            // create key for cache
-            final PreparedErrorHandler key = new PreparedErrorHandler(routeContext, processor);
-
-            // lookup cached first to reuse and preserve memory
-            answer = errorHandlers.get(key);
-            if (answer != null) {
-                log.trace("Using existing error handler for: {}", processor);
-                return answer;
-            }
-
             log.trace("Creating error handler for: {}", processor);
             ErrorHandlerFactory builder = routeContext.getRoute().getErrorHandlerBuilder();
             // create error handler (create error handler directly to keep it light weight,
@@ -356,9 +328,6 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
 
                 // must start the error handler
                 ServiceHelper.startServices(answer);
-
-                // add to cache
-                errorHandlers.putIfAbsent(key, answer);
 
             } catch (Exception e) {
                 throw ObjectHelper.wrapRuntimeCamelException(e);
@@ -380,13 +349,13 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
 
                 // rework error handling to support fine grained error handling
                 RouteContext routeContext = exchange.getUnitOfWork() != null ? exchange.getUnitOfWork().getRouteContext() : null;
-                asyncProducer = createErrorHandler(routeContext, exchange, asyncProducer);
+                AsyncProcessor target = createErrorHandler(routeContext, exchange, asyncProducer, endpoint);
 
                 // set property which endpoint we send to
                 exchange.setProperty(Exchange.TO_ENDPOINT, endpoint.getEndpointUri());
                 exchange.setProperty(Exchange.SLIP_ENDPOINT, endpoint.getEndpointUri());
 
-                return asyncProducer.process(exchange, new AsyncCallback() {
+                boolean answer = target.process(exchange, new AsyncCallback() {
                     public void done(boolean doneSync) {
                         // we only have to handle async completion of the routing slip
                         if (doneSync) {
@@ -446,9 +415,33 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
 
                         // copy results back to the original exchange
                         ExchangeHelper.copyResults(original, current);
+
+                        if (target instanceof DeadLetterChannel) {
+                            Processor deadLetter = ((DeadLetterChannel) target).getDeadLetter();
+                            try {
+                                ServiceHelper.stopService(deadLetter);
+                            } catch (Exception e) {
+                                log.warn("Error stopping DeadLetterChannel error handler on routing slip. This exception is ignored.", e);
+                            }
+                        }
+
                         callback.done(false);
                     }
                 });
+
+                // stop error handler if we completed synchronously
+                if (answer) {
+                    if (target instanceof DeadLetterChannel) {
+                        Processor deadLetter = ((DeadLetterChannel) target).getDeadLetter();
+                        try {
+                            ServiceHelper.stopService(deadLetter);
+                        } catch (Exception e) {
+                            log.warn("Error stopping DeadLetterChannel error handler on routing slip. This exception is ignored.", e);
+                        }
+                    }
+                }
+
+                return answer;
             }
         });
 
@@ -472,14 +465,11 @@ public class RoutingSlip extends ServiceSupport implements AsyncProcessor, Trace
     }
 
     protected void doStop() throws Exception {
-        ServiceHelper.stopServices(producerCache, errorHandlers);
+        ServiceHelper.stopServices(producerCache);
     }
 
     protected void doShutdown() throws Exception {
-        ServiceHelper.stopAndShutdownServices(producerCache, errorHandlers);
-
-        // only clear error handlers when shutting down
-        errorHandlers.clear();
+        ServiceHelper.stopAndShutdownServices(producerCache);
     }
 
     public EndpointUtilizationStatistics getEndpointUtilizationStatistics() {

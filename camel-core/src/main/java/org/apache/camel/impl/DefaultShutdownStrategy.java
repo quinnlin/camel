@@ -40,7 +40,7 @@ import org.apache.camel.Route;
 import org.apache.camel.Service;
 import org.apache.camel.ShutdownRoute;
 import org.apache.camel.ShutdownRunningTask;
-import org.apache.camel.SuspendableService;
+import org.apache.camel.Suspendable;
 import org.apache.camel.spi.InflightRepository;
 import org.apache.camel.spi.RouteStartupOrder;
 import org.apache.camel.spi.ShutdownAware;
@@ -91,12 +91,12 @@ import org.slf4j.LoggerFactory;
  * You can customize this using the {@link #setShutdownRoutesInReverseOrder(boolean)} method.
  * <p/>
  * After route consumers have been shutdown, then any {@link ShutdownPrepared} services on the routes
- * is being prepared for shutdown, by invoking {@link ShutdownPrepared#prepareShutdown(boolean)} which
+ * is being prepared for shutdown, by invoking {@link ShutdownPrepared#prepareShutdown(boolean,boolean)} which
  * <tt>force=false</tt>.
  * <p/>
  * Then if a timeout occurred and the strategy has been configured with shutdown-now on timeout, then
  * the strategy performs a more aggressive forced shutdown, by forcing all consumers to shutdown
- * and then invokes {@link ShutdownPrepared#prepareShutdown(boolean)} with <tt>force=true</tt>
+ * and then invokes {@link ShutdownPrepared#prepareShutdown(boolean,boolean)} with <tt>force=true</tt>
  * on the services. This allows the services to know they should force shutdown now.
  * <p/>
  * When timeout occurred and a forced shutdown is happening, then there may be threads/tasks which are
@@ -166,6 +166,11 @@ public class DefaultShutdownStrategy extends ServiceSupport implements ShutdownS
     protected boolean doShutdown(CamelContext context, List<RouteStartupOrder> routes, long timeout, TimeUnit timeUnit,
                                  boolean suspendOnly, boolean abortAfterTimeout, boolean forceShutdown) throws Exception {
 
+        // timeout must be a positive value
+        if (timeout <= 0) {
+            throw new IllegalArgumentException("Timeout must be a positive value");
+        }
+
         // just return if no routes to shutdown
         if (routes.isEmpty()) {
             return true;
@@ -175,7 +180,7 @@ public class DefaultShutdownStrategy extends ServiceSupport implements ShutdownS
 
         // at first sort according to route startup order
         List<RouteStartupOrder> routesOrdered = new ArrayList<RouteStartupOrder>(routes);
-        Collections.sort(routesOrdered, new Comparator<RouteStartupOrder>() {
+        routesOrdered.sort(new Comparator<RouteStartupOrder>() {
             public int compare(RouteStartupOrder o1, RouteStartupOrder o2) {
                 return o1.getStartupOrder() - o2.getStartupOrder();
             }
@@ -501,7 +506,7 @@ public class DefaultShutdownStrategy extends ServiceSupport implements ShutdownS
         private final TimeUnit timeUnit;
         private final AtomicBoolean timeoutOccurred;
 
-        public ShutdownTask(CamelContext context, List<RouteStartupOrder> routes, long timeout, TimeUnit timeUnit,
+        ShutdownTask(CamelContext context, List<RouteStartupOrder> routes, long timeout, TimeUnit timeUnit,
                             boolean suspendOnly, boolean abortAfterTimeout, AtomicBoolean timeoutOccurred) {
             this.context = context;
             this.routes = routes;
@@ -552,7 +557,7 @@ public class DefaultShutdownStrategy extends ServiceSupport implements ShutdownS
                         if (consumer instanceof ShutdownAware) {
                             shutdown = !((ShutdownAware) consumer).deferShutdown(shutdownRunningTask);
                         }
-                        if (shutdown && consumer instanceof SuspendableService) {
+                        if (shutdown && consumer instanceof Suspendable) {
                             // we prefer to suspend over shutdown
                             suspend = true;
                         }

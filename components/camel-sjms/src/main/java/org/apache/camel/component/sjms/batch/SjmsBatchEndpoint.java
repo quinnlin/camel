@@ -16,12 +16,14 @@
  */
 package org.apache.camel.component.sjms.batch;
 
+import java.util.concurrent.ScheduledExecutorService;
 import javax.jms.Message;
 import javax.jms.Session;
 
 import org.apache.camel.Component;
 import org.apache.camel.Consumer;
 import org.apache.camel.Exchange;
+import org.apache.camel.Predicate;
 import org.apache.camel.Processor;
 import org.apache.camel.Producer;
 import org.apache.camel.component.sjms.SjmsHeaderFilterStrategy;
@@ -32,6 +34,7 @@ import org.apache.camel.component.sjms.jms.JmsBinding;
 import org.apache.camel.component.sjms.jms.JmsKeyFormatStrategy;
 import org.apache.camel.component.sjms.jms.MessageCreatedStrategy;
 import org.apache.camel.impl.DefaultEndpoint;
+import org.apache.camel.language.simple.SimpleLanguage;
 import org.apache.camel.processor.aggregate.AggregationStrategy;
 import org.apache.camel.spi.HeaderFilterStrategy;
 import org.apache.camel.spi.HeaderFilterStrategyAware;
@@ -40,18 +43,22 @@ import org.apache.camel.spi.UriEndpoint;
 import org.apache.camel.spi.UriParam;
 import org.apache.camel.spi.UriPath;
 
-@UriEndpoint(scheme = "sjms-batch", title = "Simple JMS Batch Component", syntax = "sjms-batch:destinationName",
+/**
+ * The sjms-batch component is a specialized for highly performant, transactional batch consumption from a JMS queue.
+ */
+@UriEndpoint(scheme = "sjms-batch", title = "Simple JMS Batch", syntax = "sjms-batch:destinationName",
         consumerClass = SjmsBatchComponent.class, label = "messaging", consumerOnly = true)
 public class SjmsBatchEndpoint extends DefaultEndpoint implements HeaderFilterStrategyAware {
 
     public static final int DEFAULT_COMPLETION_SIZE = 200; // the default dispatch queue size in ActiveMQ
     public static final int DEFAULT_COMPLETION_TIMEOUT = 500;
-    public static final String PROPERTY_BATCH_SIZE = "CamelSjmsBatchSize";
 
     private JmsBinding binding;
 
     @UriPath @Metadata(required = "true")
     private String destinationName;
+    @UriParam @Metadata(required = "true")
+    private AggregationStrategy aggregationStrategy;
     @UriParam(defaultValue = "1")
     private int consumerCount = 1;
     @UriParam(defaultValue = "200")
@@ -59,22 +66,29 @@ public class SjmsBatchEndpoint extends DefaultEndpoint implements HeaderFilterSt
     @UriParam(defaultValue = "500")
     private int completionTimeout = DEFAULT_COMPLETION_TIMEOUT;
     @UriParam(defaultValue = "1000")
-    private int pollDuration = 1000;
-    @UriParam @Metadata(required = "true")
-    private AggregationStrategy aggregationStrategy;
+    private int completionInterval;
+    @UriParam(javaType = "java.lang.String")
+    private Predicate completionPredicate;
     @UriParam
-    private HeaderFilterStrategy headerFilterStrategy;
+    private boolean eagerCheckCompletion;
+    @UriParam
+    private boolean sendEmptyMessageWhenIdle;
+    @UriParam(defaultValue = "1000")
+    private int pollDuration = 1000;
     @UriParam
     private boolean includeAllJMSXProperties;
     @UriParam(defaultValue = "true")
     private boolean allowNullBody = true;
     @UriParam(defaultValue = "true")
     private boolean mapJmsMessage = true;
-    @UriParam
+    @UriParam(label = "advanced")
+    private HeaderFilterStrategy headerFilterStrategy;
+    @UriParam(label = "advanced")
     private MessageCreatedStrategy messageCreatedStrategy;
-    @UriParam
+    @UriParam(label = "advanced")
     private JmsKeyFormatStrategy jmsKeyFormatStrategy;
-
+    @UriParam(label = "advanced")
+    private ScheduledExecutorService timeoutCheckerExecutorService;
 
     public SjmsBatchEndpoint() {
     }
@@ -97,12 +111,15 @@ public class SjmsBatchEndpoint extends DefaultEndpoint implements HeaderFilterSt
 
     @Override
     public Producer createProducer() throws Exception {
-        throw new UnsupportedOperationException("Cannot produce though a " + SjmsBatchEndpoint.class.getName());
+        throw new UnsupportedOperationException("Producer not supported");
     }
 
     @Override
     public Consumer createConsumer(Processor processor) throws Exception {
-        return new SjmsBatchConsumer(this, processor);
+        SjmsBatchConsumer consumer = new SjmsBatchConsumer(this, processor);
+        consumer.setTimeoutCheckerExecutorService(timeoutCheckerExecutorService);
+        configureConsumer(consumer);
+        return consumer;
     }
 
     public Exchange createExchange(Message message, Session session) {
@@ -178,10 +195,71 @@ public class SjmsBatchEndpoint extends DefaultEndpoint implements HeaderFilterSt
     }
 
     /**
-     * The timeout from receipt of the first first message when the batch will be completed
+     * The timeout in millis from receipt of the first first message when the batch will be completed.
+     * The batch may be empty if the timeout triggered and there was no messages in the batch.
+     * <br/>
+     * Notice you cannot use both completion timeout and completion interval at the same time, only one can be configured.
      */
     public void setCompletionTimeout(int completionTimeout) {
         this.completionTimeout = completionTimeout;
+    }
+
+    public int getCompletionInterval() {
+        return completionInterval;
+    }
+
+    /**
+     * The completion interval in millis, which causes batches to be completed in a scheduled fixed rate every interval.
+     * The batch may be empty if the timeout triggered and there was no messages in the batch.
+     * <br/>
+     * Notice you cannot use both completion timeout and completion interval at the same time, only one can be configured.
+     */
+    public void setCompletionInterval(int completionInterval) {
+        this.completionInterval = completionInterval;
+    }
+
+    public Predicate getCompletionPredicate() {
+        return completionPredicate;
+    }
+
+    /**
+     * The completion predicate, which causes batches to be completed when the predicate evaluates as true.
+     * <p/>
+     * The predicate can also be configured using the simple language using the string syntax.
+     * You may want to set the option eagerCheckCompletion to true to let the predicate match the incoming message,
+     * as otherwise it matches the aggregated message.
+     */
+    public void setCompletionPredicate(Predicate completionPredicate) {
+        this.completionPredicate = completionPredicate;
+    }
+
+    public void setCompletionPredicate(String predicate) {
+        // uses simple language
+        this.completionPredicate = SimpleLanguage.predicate(predicate);
+    }
+
+    public boolean isEagerCheckCompletion() {
+        return eagerCheckCompletion;
+    }
+
+    /**
+     * Use eager completion checking which means that the completionPredicate will use the incoming Exchange.
+     * As opposed to without eager completion checking the completionPredicate will use the aggregated Exchange.
+     */
+    public void setEagerCheckCompletion(boolean eagerCheckCompletion) {
+        this.eagerCheckCompletion = eagerCheckCompletion;
+    }
+
+    public boolean isSendEmptyMessageWhenIdle() {
+        return sendEmptyMessageWhenIdle;
+    }
+
+    /**
+     * If using completion timeout or interval, then the batch may be empty if the timeout triggered and there was no messages in the batch.
+     * If this option is <tt>true</tt> and the batch is empty then an empty message is added to the batch so an empty message is routed.
+     */
+    public void setSendEmptyMessageWhenIdle(boolean sendEmptyMessageWhenIdle) {
+        this.sendEmptyMessageWhenIdle = sendEmptyMessageWhenIdle;
     }
 
     public int getPollDuration() {
@@ -277,4 +355,15 @@ public class SjmsBatchEndpoint extends DefaultEndpoint implements HeaderFilterSt
         this.includeAllJMSXProperties = includeAllJMSXProperties;
     }
 
+    public ScheduledExecutorService getTimeoutCheckerExecutorService() {
+        return timeoutCheckerExecutorService;
+    }
+
+    /**
+     * If using the completionInterval option a background thread is created to trigger the completion interval.
+     * Set this option to provide a custom thread pool to be used rather than creating a new thread for every consumer.
+     */
+    public void setTimeoutCheckerExecutorService(ScheduledExecutorService timeoutCheckerExecutorService) {
+        this.timeoutCheckerExecutorService = timeoutCheckerExecutorService;
+    }
 }

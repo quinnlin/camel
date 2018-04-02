@@ -50,8 +50,16 @@ public class SwaggerRestApiProcessorFactory implements RestApiProcessorFactory {
         }
         // and context path is the base.path
         String path = configuration.getContextPath();
-        options.put("base.path", path);
+        if (path != null) {
+            options.put("base.path", path);
+        }
 
-        return new RestSwaggerProcessor(contextIdPattern, contextIdListing, options);
+        // is cors enabled?
+        Object cors = options.get("cors");
+        if (cors == null && configuration.isEnableCORS()) {
+            options.put("cors", "true");
+        }
+
+        return new RestSwaggerProcessor(contextIdPattern, contextIdListing, options, configuration);
     }
 }

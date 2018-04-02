@@ -23,8 +23,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 
-import org.apache.camel.spi.DataFormatName;
-import org.apache.camel.support.ServiceSupport;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.XMLReader;
@@ -33,6 +31,8 @@ import org.apache.camel.Exchange;
 import org.apache.camel.component.xmlrpc.XmlRpcConstants;
 import org.apache.camel.component.xmlrpc.XmlRpcRequestImpl;
 import org.apache.camel.spi.DataFormat;
+import org.apache.camel.spi.DataFormatName;
+import org.apache.camel.support.ServiceSupport;
 import org.apache.camel.util.IOHelper;
 import org.apache.ws.commons.serialize.CharSetXMLWriter;
 import org.apache.ws.commons.serialize.XMLWriter;
@@ -76,8 +76,14 @@ public class XmlRpcDataFormat extends ServiceSupport implements DataFormat, Data
         // need to check the object type
         XMLWriter control = getXMLWriter(exchange, stream);
         XmlRpcWriter writer = new XmlRpcWriter(xmlRpcStreamRequestConfig, control, typeFactory);
-        if (graph instanceof XmlRpcRequest) {
-            writer.writeRequest(xmlRpcStreamRequestConfig, (XmlRpcRequest)graph);
+
+        XmlRpcRequest request = null;
+        if (isRequest || graph instanceof XmlRpcRequest) {
+            request = exchange.getContext().getTypeConverter().mandatoryConvertTo(XmlRpcRequest.class, exchange, graph);
+        }
+
+        if (request != null) {
+            writer.writeRequest(xmlRpcStreamRequestConfig, request);
         } else {
             // write the result here directly
             // TODO write the fault message here

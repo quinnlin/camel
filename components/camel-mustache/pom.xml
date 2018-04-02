@@ -21,11 +21,11 @@
   <parent>
     <groupId>org.apache.camel</groupId>
     <artifactId>components</artifactId>
-    <version>2.16.1-SNAPSHOT</version>
+    <version>2.19.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>camel-mustache</artifactId>
-  <packaging>bundle</packaging>
+  <packaging>jar</packaging>
   <name>Camel :: Mustache</name>
   <description>Camel Mustache support</description>
 
@@ -51,31 +51,42 @@
       <groupId>org.apache.camel</groupId>
       <artifactId>camel-test</artifactId>
       <scope>test</scope>
-    </dependency>
+    </dependency>   
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-log4j12</artifactId>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
       <scope>test</scope>
     </dependency>
-  </dependencies>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <scope>test</scope>
+    </dependency>
 
+  </dependencies>
+  
+  <!-- unit testing requires java 8 -->
   <profiles>
     <profile>
-      <id>jdk1.7</id>
-      <activation>
-        <jdk>1.7</jdk>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <skipTests>false</skipTests>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
+      <id>jdk8-test</id>
+        <activation>
+          <jdk>!1.8</jdk>
+        </activation>
+        <build>
+          <plugins>
+            <plugin>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                 <skipTests>true</skipTests>
+              </configuration>
+            </plugin>
+          </plugins>
+        </build>
+     </profile>
   </profiles>
 </project>

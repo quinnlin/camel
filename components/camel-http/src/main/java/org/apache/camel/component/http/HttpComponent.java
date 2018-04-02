@@ -23,16 +23,22 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.camel.CamelContext;
 import org.apache.camel.Endpoint;
+import org.apache.camel.Producer;
 import org.apache.camel.ResolveEndpointFailedException;
 import org.apache.camel.http.common.HttpBinding;
 import org.apache.camel.http.common.HttpCommonComponent;
 import org.apache.camel.http.common.HttpConfiguration;
+import org.apache.camel.http.common.HttpRestHeaderFilterStrategy;
 import org.apache.camel.http.common.UrlRewrite;
 import org.apache.camel.spi.HeaderFilterStrategy;
+import org.apache.camel.spi.RestProducerFactory;
 import org.apache.camel.util.CollectionHelper;
+import org.apache.camel.util.FileUtil;
 import org.apache.camel.util.IntrospectionSupport;
 import org.apache.camel.util.ObjectHelper;
+import org.apache.camel.util.ServiceHelper;
 import org.apache.camel.util.URISupport;
 import org.apache.camel.util.UnsafeUriCharactersEncoder;
 import org.apache.commons.httpclient.HttpConnectionManager;
@@ -45,7 +51,7 @@ import org.apache.commons.httpclient.params.HttpConnectionManagerParams;
  *
  * @version 
  */
-public class HttpComponent extends HttpCommonComponent {
+public class HttpComponent extends HttpCommonComponent implements RestProducerFactory {
     protected HttpClientConfigurer httpClientConfigurer;
     protected HttpConnectionManager httpConnectionManager;
 
@@ -65,12 +71,7 @@ public class HttpComponent extends HttpCommonComponent {
      */
     protected HttpClientConfigurer createHttpClientConfigurer(Map<String, Object> parameters, Set<AuthMethod> authMethods) {
         // prefer to use endpoint configured over component configured
-        // TODO cmueller: remove the "httpClientConfigurerRef" look up in Camel 3.0
-        HttpClientConfigurer configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurerRef", HttpClientConfigurer.class);
-        if (configurer == null) {
-            // try without ref
-            configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurer", HttpClientConfigurer.class);
-        }
+        HttpClientConfigurer configurer = resolveAndRemoveReferenceParameter(parameters, "httpClientConfigurer", HttpClientConfigurer.class);
         if (configurer == null) {
             // fallback to component configured
             configurer = getHttpClientConfigurer();
@@ -200,12 +201,7 @@ public class HttpComponent extends HttpCommonComponent {
         }
         Map<String, Object> httpClientParameters = new HashMap<String, Object>(parameters);
         // must extract well known parameters before we create the endpoint
-        // TODO cmueller: remove the "httpBindingRef" look up in Camel 3.0
-        HttpBinding binding = resolveAndRemoveReferenceParameter(parameters, "httpBindingRef", HttpBinding.class);
-        if (binding == null) {
-            // try without ref
-            binding = resolveAndRemoveReferenceParameter(parameters, "httpBinding", HttpBinding.class);
-        }
+        HttpBinding binding = resolveAndRemoveReferenceParameter(parameters, "httpBinding", HttpBinding.class);
         String proxyHost = getAndRemoveParameter(parameters, "proxyHost", String.class);
         Integer proxyPort = getAndRemoveParameter(parameters, "proxyPort", Integer.class);
         String authMethodPriority = getAndRemoveParameter(parameters, "authMethodPriority", String.class);
@@ -213,14 +209,17 @@ public class HttpComponent extends HttpCommonComponent {
         UrlRewrite urlRewrite = resolveAndRemoveReferenceParameter(parameters, "urlRewrite", UrlRewrite.class);
         // http client can be configured from URI options
         HttpClientParams clientParams = new HttpClientParams();
-        IntrospectionSupport.setProperties(clientParams, parameters, "httpClient.");
+        Map<String, Object> httpClientOptions = IntrospectionSupport.extractProperties(parameters, "httpClient.");
+        IntrospectionSupport.setProperties(clientParams, httpClientOptions);
         // validate that we could resolve all httpClient. parameters as this component is lenient
-        validateParameters(uri, parameters, "httpClient.");       
+        validateParameters(uri, httpClientOptions, null);
         // http client can be configured from URI options
         HttpConnectionManagerParams connectionManagerParams = new HttpConnectionManagerParams();
         // setup the httpConnectionManagerParams
-        IntrospectionSupport.setProperties(connectionManagerParams, parameters, "httpConnectionManager.");
-        validateParameters(uri, parameters, "httpConnectionManager.");
+        Map<String, Object> httpConnectionManagerOptions = IntrospectionSupport.extractProperties(parameters, "httpConnectionManager.");
+        IntrospectionSupport.setProperties(connectionManagerParams, httpConnectionManagerOptions);
+        // validate that we could resolve all httpConnectionManager. parameters as this component is lenient
+        validateParameters(uri, httpConnectionManagerOptions, null);
         // make sure the component httpConnectionManager is take effect
         HttpConnectionManager thisHttpConnectionManager = httpConnectionManager;
         if (thisHttpConnectionManager == null) {
@@ -290,6 +289,7 @@ public class HttpComponent extends HttpCommonComponent {
             }
         }
         endpoint.setHttpUri(httpUri);
+        endpoint.setHttpClientOptions(httpClientOptions);
         return endpoint;
     }
 
@@ -297,7 +297,39 @@ public class HttpComponent extends HttpCommonComponent {
                                               HttpConnectionManager connectionManager, HttpClientConfigurer configurer) throws URISyntaxException {
         return new HttpEndpoint(uri, component, clientParams, connectionManager, configurer);
     }
-    
+
+    @Override
+    public Producer createProducer(CamelContext camelContext, String host,
+                                   String verb, String basePath, String uriTemplate, String queryParameters,
+                                   String consumes, String produces, Map<String, Object> parameters) throws Exception {
+
+        // avoid leading slash
+        basePath = FileUtil.stripLeadingSeparator(basePath);
+        uriTemplate = FileUtil.stripLeadingSeparator(uriTemplate);
+
+        // get the endpoint
+        String url;
+        if (uriTemplate != null) {
+            // http is already prefixed in base path
+            url = String.format("%s/%s/%s", host, basePath, uriTemplate);
+        } else {
+            // http is already prefixed in base path
+            url = String.format("%s/%s", host, basePath);
+        }
+
+        HttpEndpoint endpoint = camelContext.getEndpoint(url, HttpEndpoint.class);
+        if (parameters != null && !parameters.isEmpty()) {
+            setProperties(camelContext, endpoint, parameters);
+        }
+        String path = uriTemplate != null ? uriTemplate : basePath;
+        endpoint.setHeaderFilterStrategy(new HttpRestHeaderFilterStrategy(path, queryParameters));
+
+        // the endpoint must be started before creating the producer
+        ServiceHelper.startService(endpoint);
+
+        return endpoint.createProducer();
+    }
+
     public HttpClientConfigurer getHttpClientConfigurer() {
         return httpClientConfigurer;
     }
@@ -336,5 +368,17 @@ public class HttpComponent extends HttpCommonComponent {
     public void setHttpConfiguration(HttpConfiguration httpConfiguration) {
         // need to override and call super for component docs
         super.setHttpConfiguration(httpConfiguration);
+    }
+
+    /**
+     * Whether to allow java serialization when a request uses context-type=application/x-java-serialized-object
+     * <p/>
+     * This is by default turned off. If you enable this then be aware that Java will deserialize the incoming
+     * data from the request to Java and that can be a potential security risk.
+     */
+    @Override
+    public void setAllowJavaSerializedObject(boolean allowJavaSerializedObject) {
+        // need to override and call super for component docs
+        super.setAllowJavaSerializedObject(allowJavaSerializedObject);
     }
 }

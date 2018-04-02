@@ -83,7 +83,6 @@ public class ScpOperations implements RemoteFileOperations<ScpFile> {
 
     @Override
     public boolean retrieveFile(String name, Exchange exchange) throws GenericFileOperationFailedException {
-        // TODO: implement
         return false;
     }
     
@@ -244,6 +243,11 @@ public class ScpOperations implements RemoteFileOperations<ScpFile> {
             if (ObjectHelper.isNotEmpty(config.getStrictHostKeyChecking())) {
                 LOG.trace("Using StrickHostKeyChecking: {}", config.getStrictHostKeyChecking());
                 session.setConfig("StrictHostKeyChecking", config.getStrictHostKeyChecking());
+            }
+
+            if (ObjectHelper.isNotEmpty(config.getPreferredAuthentications())) {
+                LOG.trace("Using preferredAuthentications: {}", config.getPreferredAuthentications());
+                session.setConfig("PreferredAuthentications", config.getPreferredAuthentications());
             }
 
             int timeout = config.getConnectTimeout();

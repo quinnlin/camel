@@ -17,12 +17,13 @@
 package org.apache.camel.component.hipchat;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Endpoint;
 import org.apache.camel.impl.UriEndpointComponent;
+import org.apache.camel.util.ObjectHelper;
+import org.apache.camel.util.URISupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,17 +54,22 @@ public class HipchatComponent extends UriEndpointComponent {
             throw new HipchatException("OAuth 2 auth token must be specified");
         }
         parseUri(uri, endpoint);
-        LOG.info("Using Hipchat API URL: " + endpoint.getConfiguration().hipChatUrl());
+        LOG.debug("Using Hipchat API URL: {}", endpoint.getConfiguration().hipChatUrl());
         return endpoint;
     }
 
-    private void parseUri(String uri, HipchatEndpoint endpoint) throws URISyntaxException {
+    private void parseUri(String uri, HipchatEndpoint endpoint) throws Exception {
+        // strip scheme
+        uri = ObjectHelper.after(uri, ":");
+        uri = URISupport.normalizeUri(uri);
+
         URI hipChatUri = new URI(uri);
         if (hipChatUri.getHost() != null) {
             endpoint.getConfiguration().setHost(hipChatUri.getHost());
             if (hipChatUri.getPort() != -1) {
                 endpoint.getConfiguration().setPort(hipChatUri.getPort());
             }
+            endpoint.getConfiguration().setProtocol(hipChatUri.getScheme());
         }
     }
 

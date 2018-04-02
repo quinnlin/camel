@@ -25,13 +25,29 @@
   <version>${version}</version>
 
   <name>Camel ${name} Component Parent</name>
-  <url>http://www.myorganization.org</url>
   <description>Parent project for Camel {$name} Component</description>
+
+  <properties>
+    <camelVersion>${camel-version}</camelVersion>
+  </properties>
 
   <modules>
     <module>${artifactId}-component</module>
     <module>${artifactId}-api</module>
   </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Camel BOM -->
+      <dependency>
+        <groupId>org.apache.camel</groupId>
+        <artifactId>camel-parent</artifactId>
+        <version>${camelVersion}</version>
+        <scope>import</scope>
+        <type>pom</type>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <build>
     <plugins>
@@ -40,8 +56,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven-compiler-plugin-version}</version>
         <configuration>
-          <source>1.7</source>
-          <target>1.7</target>
+          <source>1.8</source>
+          <target>1.8</target>
         </configuration>
       </plugin>
     </plugins>
